@@ -138,8 +138,9 @@ router.post('/', optionalAuth, async (req, res) => {
       try {
         response = await fetchMod(url, { signal: controller.signal });
         clearTimeout(timeout);
-      } catch {
+      } catch (err) {
         clearTimeout(timeout);
+        console.error('[Analyze] URL fetch failed:', err.message);
         return res.status(400).json({ error: 'Could not fetch URL' });
       }
 
@@ -303,7 +304,8 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[Analyze] Error:', err);
+    console.error('[Analyze] FULL ERROR:', err.message);
+    console.error('[Analyze] STACK:', err.stack);
     res.status(500).json({ error: 'Analysis failed. Please try again.' });
   } finally {
     // ── Cleanup ───────────────────────────────────────────────────────

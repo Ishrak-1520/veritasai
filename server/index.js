@@ -149,6 +149,74 @@ app.get(/^(?!\/api).*/, (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// DEBUG ROUTE (Temporary)
+// ---------------------------------------------------------------------------
+
+app.get('/api/debug', async (req, res) => {
+  const results = {};
+  
+  // Test 1: DB connection
+  try {
+    const { getDb } = require('./lib/db');
+    const db = getDb();
+    const row = db.prepare('SELECT COUNT(*) as count FROM scans').get();
+    results.db = { ok: true, scanCount: row.count };
+  } catch (err) {
+    results.db = { ok: false, error: err.message };
+  }
+  
+  // Test 2: Environment variables present (not their values)
+  results.env = {
+    LONGCAT_API_KEY: !!process.env.LONGCAT_API_KEY,
+    LONGCAT_BASE_URL: !!process.env.LONGCAT_BASE_URL,
+    LONGCAT_BASE_URL_OPENAI: !!process.env.LONGCAT_BASE_URL_OPENAI,
+    JWT_SECRET: !!process.env.JWT_SECRET,
+    FFMPEG_PATH: process.env.FFMPEG_PATH || 'not set',
+    FFPROBE_PATH: process.env.FFPROBE_PATH || 'not set',
+    NODE_ENV: process.env.NODE_ENV || 'not set'
+  };
+  
+  // Test 3: Can we reach Longcat API at all
+  try {
+    const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const apiRes = await fetch(
+      (process.env.LONGCAT_BASE_URL_OPENAI || '') + '/v1/chat/completions',
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (process.env.LONGCAT_API_KEY || '')
+        },
+        body: JSON.stringify({
+          model: 'LongCat-Flash-Chat',
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Say hi' }]
+        })
+      }
+    );
+    clearTimeout(timeout);
+    results.longcatPing = { ok: apiRes.ok, status: apiRes.status };
+  } catch (err) {
+    results.longcatPing = { ok: false, error: err.message };
+  }
+
+  // Test 4: ffmpeg available
+  try {
+    const { execSync } = require('child_process');
+    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+    execSync(ffmpegPath + ' -version', { timeout: 5000 });
+    results.ffmpeg = { ok: true, path: ffmpegPath };
+  } catch (err) {
+    results.ffmpeg = { ok: false, error: err.message };
+  }
+
+  res.json(results);
+});
+
+// ---------------------------------------------------------------------------
 // Initialize database & start server
 // ---------------------------------------------------------------------------
 
