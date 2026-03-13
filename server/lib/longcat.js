@@ -28,14 +28,36 @@ const API_KEY       = () => process.env.LONGCAT_API_KEY || '';
 
 // ─── Shared utilities ─────────────────────────────────────────────────────────
 
-/**
- * Strip accidental markdown code fences from LLM output.
- */
-function stripFences(text) {
+function repairJson(text) {
   let cleaned = text.trim();
+  
+  // Strip markdown fences
   cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
   cleaned = cleaned.replace(/\n?```\s*$/i, '');
-  return cleaned.trim();
+  cleaned = cleaned.trim();
+  
+  // Find the first { and last } to extract just the JSON object
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  
+  // Fix single quotes used instead of double quotes for keys
+  // Replace 'key': with "key":
+  cleaned = cleaned.replace(/([{,]\s*)'([^']+)'(\s*:)/g, '$1"$2"$3');
+  
+  // Fix trailing commas before } or ]
+  cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
+  
+  // Fix unquoted string values that should be quoted
+  // Only fix known string fields
+  cleaned = cleaned.replace(
+    /("verdict"\s*:\s*)([A-Z_]+)([,}\s])/g, 
+    '$1"$2"$3'
+  );
+  
+  return cleaned;
 }
 
 function sleep(ms) {
@@ -96,7 +118,7 @@ async function callLongcat(body, label) {
         throw new Error('Longcat API returned no text content');
       }
 
-      return JSON.parse(stripFences(textBlock.text));
+      return JSON.parse(repairJson(textBlock.text));
     } catch (err) {
       lastError = err;
       console.error(`[Longcat] ${label} attempt ${attempt} failed:`, err.message);
@@ -160,33 +182,19 @@ async function callLongcatOpenAI(body, label) {
         throw new Error('Longcat OpenAI API returned no content');
       }
 
-      let cleaned = stripFences(content);
+      const cleaned = repairJson(content);
       
-      // The vision model sometimes returns malformed JSON (missing quotes, combining fields)
-      // Attempt to repair common issues if standard parsing fails
       try {
         return JSON.parse(cleaned);
       } catch (e) {
-        console.warn(`[Longcat] Initial JSON parse failed on ${label}, attempting repair...`);
-        // Fix missing quotes around property names
-        cleaned = cleaned.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-        // Fix trailing commas
-        cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
-        // Fix weird <tag> combinations from the LLM output into a generic catch-all or remove them
-        cleaned = cleaned.replace(/"<technical_description> (.*?)"/g, '"$1"');
-        
-        try {
-          return JSON.parse(cleaned);
-        } catch (e2) {
-          console.error(`[Longcat] JSON repair failed for ${label}:`, e2.message);
-          // If we still can't parse, return a fallback safety object so the app doesn't crash
-          return {
-            verdict: "UNCERTAIN",
-            confidence: 0,
-            summary: "Analysis failed due to malformed AI response.",
-            signals: []
-          };
-        }
+        console.error(`[Longcat] JSON repair failed for ${label}:`, e.message);
+        // If we still can't parse, return a fallback safety object so the app doesn't crash
+        return {
+          verdict: "UNCERTAIN",
+          confidence: 0,
+          summary: "Analysis failed due to malformed AI response.",
+          signals: []
+        };
       }
     } catch (err) {
       lastError = err;

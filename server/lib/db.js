@@ -56,6 +56,29 @@ function initializeDatabase() {
       )
     `);
 
+    const migrations = [
+      "ALTER TABLE scans ADD COLUMN input_type TEXT",
+      "ALTER TABLE scans ADD COLUMN input_value TEXT", 
+      "ALTER TABLE scans ADD COLUMN media_type TEXT",
+      "ALTER TABLE scans ADD COLUMN verdict TEXT",
+      "ALTER TABLE scans ADD COLUMN confidence INTEGER",
+      "ALTER TABLE scans ADD COLUMN signals_json TEXT",
+      "ALTER TABLE scans ADD COLUMN explanation TEXT",
+      "ALTER TABLE scans ADD COLUMN suspected_model TEXT",
+      "ALTER TABLE scans ADD COLUMN user_id INTEGER"
+    ];
+
+    migrations.forEach(sql => {
+      try {
+        db.prepare(sql).run();
+      } catch (err) {
+        // Column already exists — this is expected and safe to ignore
+        // SQLite throws when column already exists, not when it doesn't
+      }
+    });
+
+    console.log('[DB] Migrations applied successfully');
+
     console.log('[DB] Database path:', DB_PATH);
     console.log('[DB] Tables created successfully');
   } catch (err) {
