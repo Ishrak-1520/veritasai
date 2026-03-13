@@ -1,0 +1,59 @@
+# VeritasAI Phase 5 — Security & Deployment Walkthrough
+
+## Changes Made
+
+### Server Hardening ([server/index.js](file:///c:/xampp/htdocs/Vertias/server/index.js))
+- **3 separate rate limiters**: Global (200/15min), Analyze (15/hr, skipped for auth users), Auth (10/15min)
+- **2MB body limit** (down from 50MB — files go through multer, not JSON body)
+- **`/api/health`** endpoint returning status, timestamp, version
+- **Cleanup job** runs every 30 min + at startup (deletes uploads older than 1 hour)
+- **JWT_SECRET warning** at boot if missing or < 32 chars
+
+### New File: [cleanup.js](file:///c:/xampp/htdocs/Vertias/server/lib/cleanup.js)
+Deletes stale uploaded files older than 1 hour, skips dotfiles.
+
+### SSRF & Input Sanitization ([analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js))
+- Blocks bare private IPs (10.x, 127.x, 192.168.x, 169.254.x, 172.16-31.x)
+- Blocks `file://`, `ftp://`, `javascript://` protocols
+- Rejects hostnames < 4 chars
+- URL trimmed, max 2000 chars
+- tempFileId validated: only `[a-zA-Z0-9_\-.]` allowed (prevents path traversal)
+
+### File Upload Security ([upload.js](file:///c:/xampp/htdocs/Vertias/server/routes/upload.js))
+- Filename sanitization (blocks `..`, `/`, `\`)
+- Explicit `LIMIT_FILE_SIZE` error message
+- Enhanced file-type rejection message
+
+### Auth Timing Attack Fix ([auth.js](file:///c:/xampp/htdocs/Vertias/server/routes/auth.js))
+- `bcrypt.compare` always runs against a dummy hash when user not found
+
+### Security Meta Tags (all 5 HTML files)
+- `X-Content-Type-Options: nosniff`
+- `referrer: strict-origin-when-cross-origin`
+
+### Deployment Files & Git Config
+- [Procfile](file:///c:/xampp/htdocs/Vertias/Procfile), [.env.example](file:///c:/xampp/htdocs/Vertias/.env.example), [README.md](file:///c:/xampp/htdocs/Vertias/README.md)
+- [uploads/.gitkeep](file:///c:/xampp/htdocs/Vertias/uploads/.gitkeep), [db/.gitkeep](file:///c:/xampp/htdocs/Vertias/db/.gitkeep) and corresponding [.gitignore](file:///c:/xampp/htdocs/Vertias/.gitignore) files to keep the app stateless while tracking structure
+- Root [.gitignore](file:///c:/xampp/htdocs/Vertias/.gitignore) correctly ignores [.env](file:///c:/xampp/htdocs/Vertias/.env) and `node_modules`
+- [frameExtract.js](file:///c:/xampp/htdocs/Vertias/server/lib/frameExtract.js) supports dynamic `FFMPEG_PATH` for hosting platforms like Railway.
+
+## Verification Results — All Checks Passed
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Server starts with no errors | **PASS** |
+| 2 | `GET /api/health` returns `{status:'ok', version:'1.0.0'}` | **PASS** |
+| 3 | Full analysis pipeline (picsum URL) → verdict AUTHENTIC 95% | **PASS** |
+| 4 | Upload fake .txt-as-.jpg → 400 "File type not allowed" | **PASS** |
+| 5 | SSRF: `http://127.0.0.1/image.jpg` → 400 "URL not allowed" | **PASS** |
+| 6 | SSRF: `http://192.168.1.1/test.jpg` → 400 "URL not allowed" | **PASS** |
+| 7 | `GET /api/budget` returns correct token usage | **PASS** |
+| 8 | Startup cleanup runs (no stale files to delete) | **PASS** |
+| 9 | No stack traces in any API response | **PASS** |
+| 10 | Git tracking skips [.env](file:///c:/xampp/htdocs/Vertias/.env) & user uploads/DBs | **PASS** |
+
+### Security Audit Summary
+- All DB queries use parameterized `?` placeholders
+- All catch blocks return only `{error: 'user-friendly message'}`
+- `/uploads` directory is NOT served as static (only `/public`)
+- Login timing is consistent whether email exists or not
