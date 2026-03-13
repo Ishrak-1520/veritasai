@@ -58,7 +58,7 @@ async function callLongcat(body, label) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
       let res;
       try {
         res = await fetch(ANTHROPIC_URL(), {
@@ -123,7 +123,7 @@ async function callLongcatOpenAI(body, label) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
       let res;
       try {
         res = await fetch(OPENAI_URL(), {

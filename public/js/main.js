@@ -10,7 +10,10 @@ var LOADING_MESSAGES = [
   'Running semantic analysis...',
   'Detecting generation signatures...',
   'Generating forensic report...',
-  'Preparing educational breakdown...'
+  'Preparing educational breakdown...',
+  'Still processing, please wait...',
+  'Cross-checking results...',
+  'Almost done...'
 ];
 
 var loadingInterval = null;
@@ -236,7 +239,7 @@ function startLoading() {
   loadingInterval = setInterval(function () {
     idx = (idx + 1) % LOADING_MESSAGES.length;
     updateLoadingText(LOADING_MESSAGES[idx]);
-  }, 2200);
+  }, 3000);
 }
 
 function stopLoading() {

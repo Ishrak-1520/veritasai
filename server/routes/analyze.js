@@ -304,8 +304,7 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('[Analyze] FULL ERROR:', err.message);
-    console.error('[Analyze] STACK:', err.stack);
+    console.error('[Analyze] Pipeline error:', err.message, '|', err.code || '');
     res.status(500).json({ error: 'Analysis failed. Please try again.' });
   } finally {
     // ── Cleanup ───────────────────────────────────────────────────────

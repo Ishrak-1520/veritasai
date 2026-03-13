@@ -43,8 +43,11 @@ const upload = multer({
 // ─── POST /upload ────────────────────────────────────────────────────────────
 
 router.post('/', (req, res) => {
-  upload.single('media')(req, res, async (multerErr) => {
+  upload.single('file')(req, res, async (multerErr) => {
     if (multerErr) {
+      if (multerErr.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Unexpected file field. Please use the standard upload form.' });
+      }
       if (multerErr.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
       }
