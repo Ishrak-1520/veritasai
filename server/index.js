@@ -180,7 +180,7 @@ app.get('/api/debug', async (req, res) => {
   try {
     const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 45000);
     const apiRes = await fetch(
       (process.env.LONGCAT_BASE_URL_OPENAI || '') + '/v1/chat/completions',
       {
@@ -200,7 +200,11 @@ app.get('/api/debug', async (req, res) => {
     clearTimeout(timeout);
     results.longcatPing = { ok: apiRes.ok, status: apiRes.status };
   } catch (err) {
-    results.longcatPing = { ok: false, error: err.message };
+    results.longcatPing = { 
+      ok: false, 
+      error: err.message,
+      code: err.code || 'unknown'
+    };
   }
 
   // Test 4: ffmpeg available

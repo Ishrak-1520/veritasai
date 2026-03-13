@@ -57,15 +57,23 @@ async function callLongcat(body, label) {
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await fetch(ANTHROPIC_URL(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + API_KEY(),
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      let res;
+      try {
+        res = await fetch(ANTHROPIC_URL(), {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + API_KEY(),
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(body),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!res.ok) {
         const errorBody = await res.text();
@@ -114,14 +122,22 @@ async function callLongcatOpenAI(body, label) {
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const res = await fetch(OPENAI_URL(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + API_KEY(),
-        },
-        body: JSON.stringify(body),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      let res;
+      try {
+        res = await fetch(OPENAI_URL(), {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + API_KEY(),
+          },
+          body: JSON.stringify(body),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!res.ok) {
         const errorBody = await res.text();
