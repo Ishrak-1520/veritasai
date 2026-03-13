@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeritasAI — History</title>
+  <meta name="description" content="View your past AI media detection scans.">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/index.html" class="logo">VERITAS<span>AI</span></a>
+  <div class="nav-links">
+    <a href="/index.html">Analyze</a>
+    <a href="/history.html" class="nav-authed hidden">History</a>
+    <a href="/login.html" class="nav-guest">Login</a>
+    <a href="/register.html" class="nav-guest btn-nav">Register</a>
+    <button id="logoutBtn" class="nav-authed hidden btn-nav">Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div style="margin-bottom:24px">
+    <h1 style="font-family:var(--font-mono);font-size:20px;font-weight:700;
+               margin-bottom:4px">Scan History</h1>
+    <p style="font-size:13px; color:var(--text-dim)">Your recent analyses</p>
+  </div>
+
+  <div id="historyLoading" style="text-align:center;padding:40px">
+    <div class="loading-spinner" style="margin:0 auto 16px"></div>
+    <p style="font-size:13px;color:var(--text-dim)">Loading...</p>
+  </div>
+
+  <div id="historyEmpty" class="hidden" style="text-align:center;padding:60px 20px">
+    <p style="color:var(--text-dim);margin-bottom:16px">No scans yet.</p>
+    <a href="/index.html" class="btn-primary">Start Analyzing</a>
+  </div>
+
+  <div id="historyError" class="hidden">
+    <div class="error-message" id="historyErrorMsg">Failed to load history.</div>
+  </div>
+
+  <div class="card hidden" id="historyTableWrap">
+    <table class="history-table" id="historyTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Verdict</th>
+          <th>Confidence</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/js/utils.js"></script>
+<script src="/js/history.js"></script>
+</body>
+</html>

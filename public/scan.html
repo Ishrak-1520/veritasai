@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeritasAI — Scan Result</title>
+  <meta name="description" content="View forensic analysis results for AI-generated media detection.">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/index.html" class="logo">VERITAS<span>AI</span></a>
+  <div class="nav-links">
+    <a href="/index.html">Analyze</a>
+    <a href="/history.html" class="nav-authed hidden">History</a>
+    <a href="/login.html" class="nav-guest">Login</a>
+    <a href="/register.html" class="nav-guest btn-nav">Register</a>
+    <button id="logoutBtn" class="nav-authed hidden btn-nav">Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+
+  <div id="loadingState" style="text-align:center; padding:60px 20px">
+    <div class="loading-spinner" style="margin: 0 auto 20px"></div>
+    <div style="font-family:var(--font-mono); font-size:13px;
+                color:var(--text-dim)">Loading scan...</div>
+  </div>
+
+  <div id="errorState" class="hidden" style="text-align:center; padding:60px 20px">
+    <p style="color:var(--text-dim); margin-bottom:20px" id="errorMsg">
+      Scan not found.
+    </p>
+    <a href="/index.html" class="btn-secondary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="15 18 9 12 15 6"/></svg>
+      Analyze Another
+    </a>
+  </div>
+
+  <div id="resultsContainer" class="hidden">
+
+    <a href="/index.html"
+       style="font-size:12px; color:var(--text-faint);
+              display:inline-block; margin-bottom:20px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><polyline points="15 18 9 12 15 6"/></svg>
+      Analyze Another
+    </a>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="verdict-banner" id="verdictBanner">
+        <div style="flex:1">
+          <div class="verdict-title" id="verdictTitle"></div>
+          <div class="verdict-summary" id="verdictSummary"></div>
+        </div>
+        <div class="confidence-display">
+          <div class="confidence-number" id="confidenceNumber"></div>
+          <div class="confidence-label">Confidence</div>
+        </div>
+      </div>
+      <div class="meta-row" id="metaRow">
+        <span class="meta-item">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span id="scanDate"></span>
+        </span>
+        <span class="meta-item">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          <span id="mediaType"></span>
+        </span>
+        <span class="meta-item" id="suspectedModelWrap">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span id="suspectedModel"></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="panel-header">
+        <div class="dot"></div>
+        <span>Forensic Signals</span>
+      </div>
+      <div id="signalsGrid"
+           style="padding:20px; display:grid;
+                  grid-template-columns:1fr 1fr; gap:12px">
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="panel-header">
+        <div class="dot"></div>
+        <span>Understanding This Result</span>
+      </div>
+
+      <div class="collapsible-header open" id="hdrHow">
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          &nbsp;How It Was Detected
+        </span>
+        <i class="chevron">&#9662;</i>
+      </div>
+      <div class="collapsible-body open" id="bodyHow">
+        <p id="howDetected"></p>
+      </div>
+
+      <div class="collapsible-header" id="hdrWhat">
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          &nbsp;What To Look For Yourself
+        </span>
+        <i class="chevron">&#9662;</i>
+      </div>
+      <div class="collapsible-body" id="bodyWhat">
+        <p id="whatToLookFor"></p>
+      </div>
+
+      <div class="collapsible-header" id="hdrTech">
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+          &nbsp;About The Technology
+        </span>
+        <i class="chevron">&#9662;</i>
+      </div>
+      <div class="collapsible-body" id="bodyTech">
+        <p id="technologyNote"></p>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-primary" id="copyReportBtn">Copy Report</button>
+      <button class="btn-secondary" id="shareBtn">Share Link</button>
+      <a href="/index.html" class="btn-secondary">Analyze Another</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/utils.js"></script>
+<script src="/js/results.js"></script>
+</body>
+</html>

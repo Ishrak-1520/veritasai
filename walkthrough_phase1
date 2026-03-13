@@ -1,0 +1,65 @@
+# VeritasAI – Project Setup Walkthrough
+
+## What Was Built
+
+A complete Node.js + Express project scaffold for an AI-generated media detection platform, using **vanilla HTML/CSS/JS** on the frontend and **Node.js** on the backend — no frameworks, TypeScript, or bundlers.
+
+## Project Structure
+
+```
+Vertias/
+├── .env                     # Environment variables
+├── .gitignore               # Ignores node_modules, .env, uploads, db
+├── package.json             # NPM config (13 dependencies)
+├── db/                      # SQLite database directory
+├── uploads/                 # Uploaded media files
+├── server/
+│   ├── index.js             # Express entry point
+│   ├── routes/
+│   │   ├── analyze.js       # POST /api/analyze (stub)
+│   │   ├── upload.js        # POST /api/upload (multer)
+│   │   ├── auth.js          # POST /api/auth/register, /login, GET /me
+│   │   └── scans.js         # GET /api/scans, /api/scans/:id
+│   └── lib/
+│       ├── db.js            # SQLite setup (users, scans, token_usage)
+│       ├── auth.js          # JWT middleware (requireAuth, optionalAuth)
+│       ├── longcat.js       # LLM API wrapper
+│       ├── prompts.js       # System/user prompt templates
+│       └── frameExtract.js  # Video frame extraction (ffmpeg)
+└── public/
+    ├── index.html           # Landing page
+    ├── scan.html            # Scan page (upload/URL)
+    ├── history.html         # Scan history
+    ├── login.html           # Login form
+    ├── register.html        # Registration form
+    ├── css/style.css        # Full design system
+    └── js/
+        ├── main.js          # Auth, nav, forms, scan logic
+        ├── results.js       # Result rendering stub
+        └── history.js       # History fetch & filter
+```
+
+## Key Backend Features
+
+| Feature | Details |
+|---------|---------|
+| **Rate Limiting** | 10 req/hr unauthenticated, 50 req/hr authenticated |
+| **Database** | SQLite via better-sqlite3, WAL mode, FK constraints |
+| **Auth** | bcrypt (12 rounds) + JWT (7-day expiry) |
+| **Upload** | multer with 100 MB limit, MIME filtering |
+| **SPA Fallback** | Non-API GET routes serve [index.html](file:///c:/xampp/htdocs/Vertias/public/index.html) |
+
+## Verification
+
+- ✅ `npm install` — 150 packages, 0 vulnerabilities
+- ✅ Server starts — `VeritasAI server running on port 3000`
+- ✅ Database initializes — `[DB] Database initialized successfully`
+- ✅ Homepage renders correctly in browser
+
+## Homepage Screenshot
+
+![VeritasAI Homepage](C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/veritas_homepage_hero_1773359618830.png)
+
+## Browser Recording
+
+![Homepage verification recording](C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/homepage_verification_1773359603484.webp)

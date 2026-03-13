@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeritasAI — Login</title>
+  <meta name="description" content="Sign in to VeritasAI to access your scan history.">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/index.html" class="logo">VERITAS<span>AI</span></a>
+  <div class="nav-links">
+    <a href="/index.html">Analyze</a>
+    <a href="/history.html" class="nav-authed hidden">History</a>
+    <a href="/login.html" class="nav-guest">Login</a>
+    <a href="/register.html" class="nav-guest btn-nav">Register</a>
+    <button id="logoutBtn" class="nav-authed hidden btn-nav">Logout</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="auth-card">
+    <h1>Sign In</h1>
+    <p class="subtitle">Access your scan history</p>
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input class="input-field" type="email" id="email"
+             placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input class="input-field" type="password" id="password"
+             placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;" autocomplete="current-password">
+    </div>
+    <div id="loginError" class="error-message hidden"></div>
+    <button class="btn-primary" id="loginBtn"
+            style="width:100%; margin-top:8px">Sign In</button>
+    <div class="form-footer" style="margin-top:16px">
+      Don't have an account?
+      <a href="/register.html">Register &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<script src="/js/utils.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.body.classList.add('loaded');
+  initNav();
+  if (isLoggedIn()) { window.location.href = '/index.html'; return; }
+
+  document.getElementById('loginBtn').addEventListener('click', async function () {
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    hideError('loginError');
+
+    if (!email || !password) {
+      showError('loginError', 'Email and password are required.');
+      return;
+    }
+
+    try {
+      var res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      });
+      var data = await res.json();
+      if (res.ok) {
+        saveAuth(data.token, data.userId);
+        window.location.href = '/index.html';
+      } else {
+        showError('loginError', data.error || 'Login failed.');
+      }
+    } catch (e) {
+      showError('loginError', 'Network error. Please try again.');
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('loginBtn').click();
+  });
+});
+</script>
+</body>
+</html>

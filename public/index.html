@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VeritasAI — AI Media Detection</title>
+  <meta name="description" content="Detect AI-generated media with advanced forensic analysis across 11 dimensions.">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="/index.html" class="logo">VERITAS<span>AI</span></a>
+  <div class="nav-links">
+    <a href="/index.html">Analyze</a>
+    <a href="/history.html" class="nav-authed hidden">History</a>
+    <a href="/login.html" class="nav-guest">Login</a>
+    <a href="/register.html" class="nav-guest btn-nav">Register</a>
+    <button id="logoutBtn" class="nav-authed hidden btn-nav">Logout</button>
+  </div>
+</nav>
+
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Initializing scan...</div>
+</div>
+
+<div class="main-content">
+
+  <section class="hero">
+    <div class="hero-eyebrow">Advanced Forensic Analysis</div>
+    <h1>Is This Real?</h1>
+    <p>Paste any public image or video URL, or upload a file directly.
+       Our AI examines 11 forensic dimensions to determine if media is
+       AI-generated &mdash; and explains exactly why.</p>
+    <div class="hero-status">
+      <span class="status-dot"></span>
+      Detection engine online
+    </div>
+  </section>
+
+  <div class="budget-bar-wrap" id="budgetWrap">
+    <div class="budget-bar-track">
+      <div class="budget-bar-fill" id="budgetFill"></div>
+    </div>
+    <div class="budget-label" id="budgetLabel">Loading usage...</div>
+  </div>
+
+  <div class="card" style="margin-bottom: 24px">
+    <div class="panel-header">
+      <div class="dot"></div>
+      <span>Submit Media for Analysis</span>
+    </div>
+    <div style="padding: 24px">
+
+      <div class="tab-row">
+        <button class="tab-btn active" id="tabUrl">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          &nbsp;Paste URL
+        </button>
+        <button class="tab-btn" id="tabUpload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+          &nbsp;Upload File
+        </button>
+      </div>
+
+      <div id="urlSection">
+        <input class="input-field" id="urlInput" type="url"
+          placeholder="https://example.com/image.jpg  or  video URL...">
+        <p style="font-size:11px; font-family:var(--font-mono);
+           color:var(--text-faint); margin-top:8px">
+          Supports JPG &middot; PNG &middot; WebP &middot; GIF &middot; MP4 &middot; WebM &middot; MOV
+        </p>
+      </div>
+
+      <div id="uploadSection" class="hidden">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-zone-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <p>Drop image or video here, or click to browse</p>
+          <small>Max 50MB &middot; JPG PNG WebP GIF MP4 WebM MOV</small>
+          <input type="file" id="fileInput" accept="image/*,video/*"
+                 style="display:none">
+        </div>
+        <img id="imagePreview" class="hidden"
+          style="max-height:200px; max-width:100%; margin-top:12px;
+                 border-radius:var(--radius); border:1px solid var(--border);
+                 display:block">
+      </div>
+
+      <div id="formError" class="error-message hidden"></div>
+
+      <div style="display:flex; align-items:center;
+                  justify-content:space-between; margin-top:16px; gap:12px">
+        <span id="fileLabel"
+              style="font-size:11px; font-family:var(--font-mono);
+                     color:var(--text-faint)">No file selected</span>
+        <button class="btn-primary" id="analyzeBtn" disabled>
+          &#9670; &nbsp;ANALYZE
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <section>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px">
+      <span style="font-family:var(--font-mono); font-size:10px;
+                   letter-spacing:3px; color:var(--text-dim); text-transform:uppercase">
+        How Detection Works
+      </span>
+      <div style="flex:1; height:1px; background:var(--border)"></div>
+    </div>
+    <div class="how-grid">
+      <div class="how-card">
+        <div class="how-num">01</div>
+        <div class="how-title">Submit Media</div>
+        <div class="how-desc">Paste any public URL or upload a file directly.
+          Images and video are both supported.</div>
+      </div>
+      <div class="how-card">
+        <div class="how-num">02</div>
+        <div class="how-title">Forensic Analysis</div>
+        <div class="how-desc">Our AI examines 11 forensic dimensions: facial
+          geometry, lighting, texture, artifacts, and semantic coherence.</div>
+      </div>
+      <div class="how-card">
+        <div class="how-num">03</div>
+        <div class="how-title">Understand Why</div>
+        <div class="how-desc">Results include plain-language explanations of
+          every signal detected so you can learn to spot AI content yourself.</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="/js/utils.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

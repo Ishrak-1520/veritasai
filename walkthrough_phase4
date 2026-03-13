@@ -1,0 +1,47 @@
+# VeritasAI Phase 4 — Frontend Rewrite Walkthrough
+
+## What Changed
+
+Created/rewrote all `public/` files to build a complete dark forensics-lab UI:
+
+| File | Purpose |
+|------|---------|
+| [public/js/utils.js](file:///c:/xampp/htdocs/Vertias/public/js/utils.js) | Auth helpers, formatting, verdict/severity helpers, navbar init |
+| [public/css/style.css](file:///c:/xampp/htdocs/Vertias/public/css/style.css) | Full design system with Space Mono + Inter, CSS variables, responsive |
+| [public/index.html](file:///c:/xampp/htdocs/Vertias/public/index.html) | Homepage with hero, budget bar, URL/Upload tabs, how-it-works |
+| [public/js/main.js](file:///c:/xampp/htdocs/Vertias/public/js/main.js) | Tab switching, drag-drop, file validation, analyze workflow, loading overlay |
+| [public/scan.html](file:///c:/xampp/htdocs/Vertias/public/scan.html) | Scan results page with verdict banner, signals grid, education sections |
+| [public/js/results.js](file:///c:/xampp/htdocs/Vertias/public/js/results.js) | Loads scan data, renders verdict/signals/education, copy report, share link |
+| [public/history.html](file:///c:/xampp/htdocs/Vertias/public/history.html) | History table page |
+| [public/js/history.js](file:///c:/xampp/htdocs/Vertias/public/js/history.js) | Loads authenticated user's scan history |
+| [public/login.html](file:///c:/xampp/htdocs/Vertias/public/login.html) | Login page with inline auth script |
+| [public/register.html](file:///c:/xampp/htdocs/Vertias/public/register.html) | Registration page with password validation |
+| [server/index.js](file:///c:/xampp/htdocs/Vertias/server/index.js) | Added `GET /api/budget` route |
+
+## Verification Results — All 9 Checkpoints Passed
+
+### 1. Homepage
+Dark theme, Space Mono font, status dot, budget bar, URL/Upload tabs, disabled ANALYZE button, 3 how-it-works cards.
+
+![Homepage](file:///C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/verification_full_page_1773387560552.png)
+
+### 2-4. Auth Flow (Register / Logout / Login)
+All three steps passed — navbar correctly toggles between guest and authenticated states.
+
+### 5-6. Analysis Pipeline + Scan Results
+URL paste enables ANALYZE button. Loading overlay cycles through messages. Redirects to scan.html with verdict banner (green, 85% confidence), 6 signal cards, and 3 collapsible education sections.
+
+![Scan Results](file:///C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/step2_scan_results_loaded_1773387826811.png)
+
+### 7. History Page
+Table loads with scan row showing Date, Type (URL), Verdict (Likely Authentic), Confidence (85%), and View link.
+
+![History](file:///C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/step4_history_page_1773387853158.png)
+
+### 8. Error State
+Invalid scan ID shows "Scan not found" with Analyze Another button.
+
+![Error State](file:///C:/Users/Admin/.gemini/antigravity/brain/5b704265-b4e2-476d-8c51-ff758a4f436e/step5_error_state_1773387866698.png)
+
+### 9. Budget Bar
+Shows "6,728 of 4,500,000 daily tokens used" reflecting actual usage after the scan.
