@@ -274,23 +274,24 @@ router.post('/', optionalAuth, async (req, res) => {
     const { getDb } = require('../lib/db');
     const db = getDb();
 
-    db.prepare(
-      `INSERT INTO scans
+    await db.execute({
+      sql: `INSERT INTO scans
        (id, user_id, input_type, input_value, media_type, verdict, confidence,
         signals_json, explanation, suspected_model)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      scanId,
-      req.user?.id || null,
-      type,
-      inputValue,
-      mediaType,
-      forensicResult.verdict,
-      forensicResult.confidence,
-      JSON.stringify(forensicResult.signals),
-      JSON.stringify(explanation),
-      forensicResult.suspected_model || null
-    );
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        scanId,
+        req.user?.id || null,
+        type,
+        inputValue,
+        mediaType,
+        forensicResult.verdict,
+        forensicResult.confidence,
+        JSON.stringify(forensicResult.signals),
+        JSON.stringify(explanation),
+        forensicResult.suspected_model || null
+      ]
+    });
 
     // ── STEP 9: Respond ─────────────────────────────────────────────────
     res.json({

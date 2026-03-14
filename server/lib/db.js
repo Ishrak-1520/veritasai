@@ -1,6 +1,7 @@
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const path = require('path');
 const fs = require('fs');
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 
 const DB_PATH = path.join(__dirname, '..', '..', 'db', 'app.db');
 
@@ -10,22 +11,23 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-let db;
+let client;
 
 function getDb() {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
+  if (!client) {
+    client = createClient({
+      url: process.env.TURSO_DATABASE_URL || `file:${DB_PATH}`,
+      authToken: process.env.TURSO_AUTH_TOKEN
+    });
   }
-  return db;
+  return client;
 }
 
-function initializeDatabase() {
+async function initializeDatabase() {
   try {
     const db = getDb();
 
-    db.exec(`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE,
@@ -34,7 +36,7 @@ function initializeDatabase() {
       )
     `);
 
-    db.exec(`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS scans (
         id TEXT PRIMARY KEY,
         user_id TEXT,
@@ -49,7 +51,7 @@ function initializeDatabase() {
       )
     `);
 
-    db.exec(`
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS token_usage (
         date TEXT PRIMARY KEY,
         tokens_used INTEGER DEFAULT 0
@@ -68,18 +70,18 @@ function initializeDatabase() {
       "ALTER TABLE scans ADD COLUMN user_id INTEGER"
     ];
 
-    migrations.forEach(sql => {
+    for (const sql of migrations) {
       try {
-        db.prepare(sql).run();
+        await db.execute(sql);
       } catch (err) {
         // Column already exists — this is expected and safe to ignore
         // SQLite throws when column already exists, not when it doesn't
       }
-    });
+    }
 
     console.log('[DB] Migrations applied successfully');
 
-    console.log('[DB] Database path:', DB_PATH);
+    console.log('[DB] Database path:', process.env.TURSO_DATABASE_URL ? 'Turso Cloud' : DB_PATH);
     console.log('[DB] Tables created successfully');
   } catch (err) {
     console.error('[DB] FATAL: Could not initialize database:', err.message);

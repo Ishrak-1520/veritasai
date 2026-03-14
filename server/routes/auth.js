@@ -33,20 +33,25 @@ router.post('/register', async (req, res) => {
     }
 
     const db = getDb();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const existingResult = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ?',
+      args: [email]
+    });
+    const existing = existingResult.rows[0];
 
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = db
-      .prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
-      .run(email, passwordHash);
+    const result = await db.execute({
+      sql: 'INSERT INTO users (email, password_hash) VALUES (?, ?)',
+      args: [email, passwordHash]
+    });
 
-    const token = generateToken(result.lastInsertRowid);
+    const token = generateToken(result.lastInsertRowid.toString());
 
-    res.status(201).json({ token, userId: result.lastInsertRowid });
+    res.status(201).json({ token, userId: result.lastInsertRowid.toString() });
   } catch (err) {
     console.error('[Auth] Register error:', err);
     res.status(500).json({ error: 'Registration failed' });
@@ -67,7 +72,11 @@ router.post('/login', async (req, res) => {
     }
 
     const db = getDb();
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const userResult = await db.execute({
+      sql: 'SELECT * FROM users WHERE email = ?',
+      args: [email]
+    });
+    const user = userResult.rows[0];
 
     // Always compare to prevent timing attacks — even if user doesn't exist
     const hashToCheck = user ? user.password_hash : DUMMY_HASH;
@@ -88,12 +97,14 @@ router.post('/login', async (req, res) => {
 
 // ─── GET /me ─────────────────────────────────────────────────────────────────
 
-router.get('/me', requireAuth, (req, res) => {
+router.get('/me', requireAuth, async (req, res) => {
   try {
     const db = getDb();
-    const user = db
-      .prepare('SELECT id, email, created_at FROM users WHERE id = ?')
-      .get(req.user.id);
+    const userResult = await db.execute({
+      sql: 'SELECT id, email, created_at FROM users WHERE id = ?',
+      args: [req.user.id]
+    });
+    const user = userResult.rows[0];
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });

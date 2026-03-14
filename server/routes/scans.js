@@ -29,12 +29,14 @@ function hydrateScan(row) {
 
 // ─── GET /history ────────────────────────────────────────────────────────────
 
-router.get('/history', requireAuth, (req, res) => {
+router.get('/history', requireAuth, async (req, res) => {
   try {
     const db = getDb();
-    const rows = db
-      .prepare('SELECT * FROM scans WHERE user_id = ? ORDER BY created_at DESC LIMIT 20')
-      .all(req.user.id);
+    const rowsResult = await db.execute({
+      sql: 'SELECT * FROM scans WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
+      args: [req.user.id]
+    });
+    const rows = rowsResult.rows;
 
     res.json(rows.map(hydrateScan));
   } catch (err) {
@@ -45,10 +47,14 @@ router.get('/history', requireAuth, (req, res) => {
 
 // ─── GET /:id ────────────────────────────────────────────────────────────────
 
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const db = getDb();
-    const row = db.prepare('SELECT * FROM scans WHERE id = ?').get(req.params.id);
+    const rowResult = await db.execute({
+      sql: 'SELECT * FROM scans WHERE id = ?',
+      args: [req.params.id]
+    });
+    const row = rowResult.rows[0];
 
     if (!row) {
       return res.status(404).json({ error: 'Scan not found' });

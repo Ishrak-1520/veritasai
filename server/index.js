@@ -115,12 +115,16 @@ app.use('/api/scans', scansRoutes);
 // Budget endpoint (lightweight, no separate route file needed)
 // ---------------------------------------------------------------------------
 
-app.get('/api/budget', (req, res) => {
+app.get('/api/budget', async (req, res) => {
   try {
     const { getDb } = require('./lib/db');
     const db = getDb();
     const today = new Date().toISOString().slice(0, 10);
-    const row = db.prepare('SELECT tokens_used FROM token_usage WHERE date = ?').get(today);
+    const rowResult = await db.execute({
+      sql: 'SELECT tokens_used FROM token_usage WHERE date = ?',
+      args: [today]
+    });
+    const row = rowResult.rows[0];
     const used = row ? row.tokens_used : 0;
     const limit = 4500000;
     res.json({ used, remaining: limit - used, limit });
@@ -155,12 +159,21 @@ app.get(/^(?!\/api).*/, (_req, res) => {
 // Initialize database & start server
 // ---------------------------------------------------------------------------
 
-initializeDatabase();
+async function startServer() {
+  try {
+    await initializeDatabase();
 
-// Run cleanup once at startup, then every 30 minutes
-cleanupOldUploads();
-setInterval(cleanupOldUploads, 30 * 60 * 1000);
+    // Run cleanup once at startup, then every 30 minutes
+    cleanupOldUploads();
+    setInterval(cleanupOldUploads, 30 * 60 * 1000);
 
-app.listen(PORT, () => {
-  console.log(`VeritasAI server running on port ${PORT}`);
-});
+    app.listen(PORT, () => {
+      console.log(`VeritasAI server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('[Server] Failed to start:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();

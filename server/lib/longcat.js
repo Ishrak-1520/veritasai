@@ -287,12 +287,17 @@ async function trackTokenUsage(tokensUsed) {
   const db = getDb();
   const today = new Date().toISOString().slice(0, 10);
 
-  db.prepare(
-    `INSERT INTO token_usage (date, tokens_used) VALUES (?, ?)
-     ON CONFLICT(date) DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used`
-  ).run(today, tokensUsed);
+  await db.execute({
+    sql: `INSERT INTO token_usage (date, tokens_used) VALUES (?, ?)
+     ON CONFLICT(date) DO UPDATE SET tokens_used = tokens_used + excluded.tokens_used`,
+    args: [today, tokensUsed]
+  });
 
-  const row = db.prepare('SELECT tokens_used FROM token_usage WHERE date = ?').get(today);
+  const rowResult = await db.execute({
+    sql: 'SELECT tokens_used FROM token_usage WHERE date = ?',
+    args: [today]
+  });
+  const row = rowResult.rows[0];
   return row ? row.tokens_used : tokensUsed;
 }
 
@@ -305,7 +310,11 @@ async function checkTokenBudget() {
   const db = getDb();
   const today = new Date().toISOString().slice(0, 10);
 
-  const row = db.prepare('SELECT tokens_used FROM token_usage WHERE date = ?').get(today);
+  const rowResult = await db.execute({
+    sql: 'SELECT tokens_used FROM token_usage WHERE date = ?',
+    args: [today]
+  });
+  const row = rowResult.rows[0];
   if (!row) return true;
   return row.tokens_used < 4500000;
 }
