@@ -39,15 +39,14 @@ async function initializeDatabase() {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS scans (
         id TEXT PRIMARY KEY,
-        user_id TEXT,
+        user_id INTEGER,
         type TEXT,
         media_url TEXT,
         verdict TEXT,
         confidence INTEGER,
         signals_json TEXT,
         explanation TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
 

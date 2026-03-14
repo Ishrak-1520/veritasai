@@ -274,6 +274,17 @@ router.post('/', optionalAuth, async (req, res) => {
     const { getDb } = require('../lib/db');
     const db = getDb();
 
+    let userId = null;
+    if (req.user?.id) {
+      const userResult = await db.execute({
+        sql: 'SELECT id FROM users WHERE id = ?',
+        args: [req.user.id]
+      });
+      if (userResult.rows[0]) {
+        userId = req.user.id;
+      }
+    }
+
     await db.execute({
       sql: `INSERT INTO scans
        (id, user_id, input_type, input_value, media_type, verdict, confidence,
@@ -281,7 +292,7 @@ router.post('/', optionalAuth, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         scanId,
-        req.user?.id || null,
+        userId,
         type,
         inputValue,
         mediaType,
