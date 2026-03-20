@@ -249,7 +249,46 @@ function generateEvidenceReport(scan) {
     doc.moveDown(0.8);
 
     const signals = scan.signals || [];
-    signals.forEach(signal => {
+
+    // Sanitize signals before rendering
+    const cleanSignals = signals.filter(signal => {
+      // Remove signals with broken names
+      if (!signal.name) return false;
+      if (signal.name.trim() === '\\') return false;
+      if (signal.name.trim() === '') return false;
+      if (signal.name.includes('}, {')) return false;
+      if (signal.name.includes('\\\"')) return false;
+      if (signal.name.length > 60) return false; // names should be short
+      return true;
+    }).map(signal => ({
+      ...signal,
+      // Clean the name
+      name: signal.name
+        .replace(/^[\\/"'\\s]+/, '')   // strip leading junk
+        .replace(/[\\/"']+$/, '')     // strip trailing junk
+        .replace(/\\\\+/g, '')          // remove backslashes
+        .trim(),
+      // Clean the description
+      technical_description: (signal.technical_description || '')
+        .replace(/^[\\/"'\\s]+/, '')   // strip leading junk chars
+        .replace(/^\\\\?"?/, '')        // remove leading \\" or "
+        .replace(/\\\\?"?$/, '')        // remove trailing \\" or "
+        .replace(/\\\\"/g, '"')         // unescape escaped quotes
+        .replace(/"\\s*},\\s*\\{.*$/s, '') // remove JSON fragments at end
+        .replace(/\\}\\s*\\].*$/s, '')   // remove array closing fragments
+        .replace(/\\s+/g, ' ')         // collapse whitespace
+        .trim()
+        // If description is still garbage (too short or has JSON chars), replace it
+        || 'Analysis detected this signal during forensic examination.'
+    })).filter(signal => {
+      // Second pass — remove any that still look broken after cleaning
+      if (signal.name.length < 2) return false;
+      if (signal.technical_description.startsWith('{')) return false;
+      if (signal.technical_description.startsWith('[')) return false;
+      return true;
+    });
+
+    cleanSignals.forEach(signal => {
       const sevColor = SEVERITY_COLORS[signal.severity] || '#006699';
 
       // Estimate block height (title + desc lines)
@@ -353,6 +392,9 @@ function generateEvidenceReport(scan) {
     // Add footers to all pages
     const range = doc.bufferedPageRange();
     const totalPages = range.count;
+    
+    console.log('[PDF] Pages before footer:', totalPages);
+    console.log('[PDF] doc already ended?', doc._ended || 'unknown');
     
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);

@@ -1,44 +1,29 @@
 {
-  "verdict": "AUTHENTIC",
-  "confidence": 89,
-  "summary": "The image shows consistent authentic characteristics with natural lighting, realistic textures, and plausible object interactions. No definitive AI artifacts were detected across multiple forensic dimensions.",
-  "suspected_model": null,
+  "verdict": "AI_GENERATED",
+  "confidence": 85,
+  "summary": "The image exhibits multiple forensic indicators consistent with AI generation, including unnatural skin texture uniformity and subtle inconsistencies in facial lighting. The presence of a watermark referencing StyleGAN2 strongly suggests synthetic origin.",
+  "suspected_model": "StyleGAN",
   "generation_technique": null,
   "signals": [
     {
-      "name": "Hand and Finger Anatomy",
-      "severity": "CLEAR",
-      "technical_description": "Both hands show correct finger count, natural joint proportions, and plausible typing posture. No merged digits or anatomical anomalies detected."
+      "name": "\"StyleGAN2\" watermark",
+      "severity": "CRITICAL",
+      "technical_description": "The image contains a visible watermark in the bottom right corner reading 'StyleGAN2 (Karras et al.)', which directly identifies it as output from a known generative adversarial network model. This is definitive evidence of AI generation."
     },
     {
-      "name": "Skin Texture",
-      "severity": "CLEAR",
-      "technical_description": "Visible skin on hands and neck shows natural pore structure, micro-variation, and realistic texture consistent with real photography. No AI smoothing artifacts present."
+      "name": "Skin texture uniformity",
+      "severity": "WARNING",
+      "technical_description": "The skin exhibits unnaturally smooth and uniform texture with minimal pore structure or natural imperfections, particularly around the cheeks and forehead. This lack of micro-detail is characteristic of GAN-generated faces."
     },
     {
-      "name": "Lighting Consistency",
-      "severity": "CLEAR",
-     	"technical_description": "Shadows and highlights are consistent with a single natural light source from the upper left. Specular reflections on watch face and cup follow expected physics."
+      "name": "Lighting consistency",
+      "severity": "NOTE",
+      "technical_description": "\"The lighting on the face appears slightly inconsistent, with subtle mismatches in shadow direction between the nose and cheek areas. While not definitive alone, this contributes to an overall synthetic appearance when combined with other signals."
     },
     {
-      "name": "Background Plausibility",
-      "severity": "CLEAR",
-     	"technical_description": "Outdoor setting with wooden table, smartphone, notebook, and coffee cup forms a coherent and realistic scene. Perspective relationships between objects are physically plausible."
-    },
-    {
-      "name": "Edge Artifacts",
-      "severity": "CLEAR",
-     	"technical_description": "Subject boundaries show natural depth-of-field blur consistent with real camera optics. No halo effects, composite seams, or unnatural edge sharpening detected."
-    },
-    {
-      "name": "Semantic Coherence",
-      "severity": "CLEAR",
-     	"technical_description": "The scene depicts a realistic human activity (working on laptop outdoors) with appropriate objects and context. All elements belong together logically."
-    },
-    {
-      "name": "Hair Coherence",
-      "severity": "CLEAR",
-     	"technical_description": "Visible hair on neck and head shows natural strand definition, texture variation, and realistic blending with skin. No uniform clumping or artificial rendering detected."
+      "name": "Hair strand definition",
+      "severity": "NOTE",
+      "\"The hair strands show some unnatural clustering and lack fine individual detail, especially near the edges of the face. This is a common artifact in GAN-generated portraits where hair rendering remains challenging."
     }
   ]
 }
