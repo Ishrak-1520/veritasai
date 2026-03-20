@@ -45,6 +45,37 @@ router.get('/history', requireAuth, async (req, res) => {
   }
 });
 
+// ─── GET /:id/pdf ────────────────────────────────────────────────────────────
+
+router.get('/:id/pdf', async (req, res) => {
+  try {
+    const db = getDb();
+    const rowResult = await db.execute({
+      sql: 'SELECT * FROM scans WHERE id = ?',
+      args: [req.params.id]
+    });
+    const row = rowResult.rows[0];
+
+    if (!row) {
+      return res.status(404).json({ error: 'Scan not found' });
+    }
+
+    const scan = hydrateScan(row);
+    const { generateEvidenceReport } = require('../lib/pdfReport');
+    const pdfBuffer = await generateEvidenceReport(scan);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="veritasai-report-' + scan.id + '.pdf"',
+      'Content-Length': pdfBuffer.length
+    });
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[Scans] PDF generation error:', err);
+    res.status(500).json({ error: 'Failed to generate PDF report' });
+  }
+});
+
 // ─── GET /:id ────────────────────────────────────────────────────────────────
 
 router.get('/:id', async (req, res) => {

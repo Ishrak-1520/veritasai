@@ -144,6 +144,25 @@ function renderScan(scan) {
       setTimeout(function () { btn.textContent = 'Share Link'; }, 2000);
     });
   });
+
+  /* ── Download PDF Evidence Report ───────────────── */
+  document.getElementById('downloadPdfBtn').addEventListener('click', function () {
+    var btn = document.getElementById('downloadPdfBtn');
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    var a = document.createElement('a');
+    a.href = '/api/scans/' + scan.id + '/pdf';
+    a.download = 'veritasai-report-' + scan.id + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(function () {
+      btn.innerHTML = '&#8595; &nbsp;Evidence Report';
+      btn.disabled = false;
+    }, 3000);
+  });
 }
 
 /* ── Collapsible toggle ────────────────────────────── */

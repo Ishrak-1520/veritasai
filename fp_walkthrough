@@ -5,7 +5,7 @@
 ### First Pass
 
 1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)** — Rewrote `FORENSIC_PROMPT` to add authenticity bias and false-positive exclusions, added SKEPTIC_PROMPT, and updated `EDUCATION_PROMPT`.
-2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#393-438) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#439-536).
+2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#503-548) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#549-646).
 3. **[analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js)** — Implemented confidence calibration via [calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#87-146) and updated image pipeline to use the verification step.
 
 ### Second Pass (Empty Signals Fix)
@@ -19,10 +19,10 @@
 ### Third Pass (JSON Extraction & Fallback)
 
 1. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) (JSON Repair & Replay)**
-   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-93) string parsing by extracting valid portions from syntax-broken strings.
-   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#94-134) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
+   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#96-164) string parsing by extracting valid portions from syntax-broken strings.
+   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
    - Added `FORENSIC_PROMPT_SIMPLE` in [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)
-   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#347-392) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
+   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#457-502) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
 
 ## Final Test Results
 
@@ -42,14 +42,14 @@ During testing, we discovered the following issues:
 We addressed these by:
 1. **Rebalancing the `FORENSIC_PROMPT`**: Replaced the harsh authenticity bias with a "balanced forensic" preamble, and explicitly instructed it to assess typical GAN face traits (asymmetrical eyes, blurred edges, clipping jewelry).
 2. **Correcting Few-Shot Examples**: Overrode the `FORENSIC_PROMPT`'s examples to use strict `JSON.parse` suitable double quotes.
-3. **Robust Regex Extraction**: Rewrote [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#94-134) inside [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) to account for both `[technical_description]` and `<technical_description>` pseudo-JSON tag outputs to always rescue raw AI thoughts.
+3. **Robust Regex Extraction**: Rewrote [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244) inside [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) to account for both `[technical_description]` and `<technical_description>` pseudo-JSON tag outputs to always rescue raw AI thoughts.
 4. **Retry Loop Enforcement**: Hardened the condition for accepting a partial extraction to `≥ 3` signals. A heavily truncated output with 1-2 signals now correctly trips the `isParseFallback` flag and automatically retries with `FORENSIC_PROMPT_SIMPLE`.
 
 All automated test conditions run against Face and Walrus images passed successfully. The changes have been committed and pushed to the repository.
 
 ### Implementing SSE Real-time Progression Stream
 
-To elevate the UX, a real-time event-streaming (SSE) component was retrofitted onto the [analyze](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#301-346) workflow.
+To elevate the UX, a real-time event-streaming (SSE) component was retrofitted onto the [analyze](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#411-456) workflow.
 
 1. **Backend Event Stream ([analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js))**: The standard JSON response model for `POST /api/analyze` was transformed into a native `text/event-stream` feed. The API now emits checkpoint data via `res.write()` at explicit boundaries (BUDGET, VALIDATION, EXTRACTION, FORENSIC, EDUCATION, DB SAVE) without ending the connection.
 2. **Component Redesign ([style.css](file:///c:/xampp/htdocs/Vertias/public/css/style.css) & [index.html](file:///c:/xampp/htdocs/Vertias/public/index.html))**: Substituted the legacy `.loading-overlay` spinner for a new modern floating `.progress-panel`, showcasing individual tasks, ticking load times, and dynamic highlighting for Active (`border: 1px solid var(--cyan)`), Completed (Green Tick), or Failed (Red Cross) states.
@@ -60,4 +60,21 @@ The SSE Stream UI effectively tracks Longcat interactions during extraction and 
 ![SSE Progress Streaming Verification Run](/C:/Users/Admin/.gemini/antigravity/brain/17579e89-b186-45f2-b883-6447a36dc996/sse_progress_stream_verification_1774003429932.webp)
 - Second Pass Commit: `47b7a26`
 - Third Pass Commit: `524ee01`
+- Fourth Pass Commit (SSE UI): `c16431b`
+
+### Rescuing Corrupted JSON Longcat Outputs
+During extensive testing, it was found that standard JSON parsing and Regex algorithms were insufficient for correctly parsing out complex `"technical_description"` paragraphs generated by the `LongCat-Flash-Omni-2603` model. Hallucinations frequently threw:
+- Unescaped single quotes wrapped in double quotes
+- Erroneous XML brackets around single elements
+- Discarding the `technical_description` Key-Value mapping entirely, dumping just the string value.
+
+**Resolution:**
+The [server/lib/longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) interceptor was injected with new ultra-aggressive sanitization pipelines ahead of any `JSON.parse` attempts:
+1. [sanitizeDescriptions(text)](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-51): Scans for and escapes raw inner quotes within the bounding array strings.
+2. [sanitizeSignalsArray(text)](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#52-95): Flattens multi-line structures recursively inside the top level `signals:` object to enforce standard object bounds.
+3. [extractPartialResult](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244): Failsafe array destructuring was rewritten to automatically catch and strip keys matching permutations of single/double quotes, parsing the raw substring slice matching the object remainder immediately following the `severity` match.
+
+Local test results validated 100% extraction recovery across `Face` and `Nature` analysis cases.
+- Final Parser Resiliency Commit: `21c850b`
+
 Render will now auto-deploy the latest fixes.
