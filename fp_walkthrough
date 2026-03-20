@@ -78,3 +78,22 @@ Local test results validated 100% extraction recovery across `Face` and `Nature`
 - Final Parser Resiliency Commit: `21c850b`
 
 Render will now auto-deploy the latest fixes.
+
+### PDF Evidence Report Download
+
+Added a professional PDF report generation feature to the scan results page.
+
+**Files Created/Modified:**
+- [pdfReport.js](file:///c:/xampp/htdocs/Vertias/server/lib/pdfReport.js) — New PDFKit-based generator with header band, disclaimer, metadata, signals, education, and footer sections
+- [scans.js](file:///c:/xampp/htdocs/Vertias/server/routes/scans.js) — Added `GET /:id/pdf` route
+- [scan.html](file:///c:/xampp/htdocs/Vertias/public/scan.html) — Added "Evidence Report" button
+- [results.js](file:///c:/xampp/htdocs/Vertias/public/js/results.js) — Wired download handler
+
+**Verification:**
+- Browser test confirmed button renders and triggers download (button changes to "Generating...")
+- Direct curl test: `HTTP 200`, 8,516 bytes PDF generated
+- No console or server errors
+
+![Scan results page with Evidence Report button](file:///C:/Users/Admin/.gemini/antigravity/brain/17579e89-b186-45f2-b883-6447a36dc996/evidence_report_clicked_1774006057862.png)
+
+- PDF Report Commit: `4b6a6d9`

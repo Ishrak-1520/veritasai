@@ -16,46 +16,61 @@ const VERDICT_COLORS = {
 };
 
 const SEVERITY_COLORS = {
-  CRITICAL: '#ff3355',
-  WARNING:  '#ffaa00',
-  NOTE:     '#004466',
-  CLEAR:    '#00cc66',
+  CRITICAL: '#cc0033',
+  WARNING:  '#cc7700',
+  NOTE:     '#006699',
+  CLEAR:    '#007744',
 };
 
 const VERDICT_LABELS = {
-  AI_GENERATED: 'AI-GENERATED CONTENT DETECTED',
-  AUTHENTIC:    'LIKELY AUTHENTIC',
-  UNCERTAIN:    'INCONCLUSIVE ANALYSIS',
+  AI_GENERATED: '!! AI-GENERATED CONTENT DETECTED',
+  AUTHENTIC:    '>> LIKELY AUTHENTIC',
+  UNCERTAIN:    '?? INCONCLUSIVE ANALYSIS',
 };
 
-const VERDICT_ICONS = {
-  AI_GENERATED: '!',
-  AUTHENTIC:    '\u2713',
-  UNCERTAIN:    '?',
+const VERDICT_META_LABELS = {
+  AI_GENERATED: 'AI-GENERATED',
+  AUTHENTIC:    'AUTHENTIC',
+  UNCERTAIN:    'UNCERTAIN',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function hexToRGB(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return [r, g, b];
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return 'Unknown';
-  const d = new Date(dateStr);
-  return d.toLocaleString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
-  });
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+    });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function addSection(doc, title) {
+  doc.moveDown(1);
+  const y = doc.y;
+  doc.font('Helvetica-Bold')
+     .fontSize(9)
+     .fillColor('#00aacc')
+     .text(title.toUpperCase(), 60, y);
+  
+  doc.moveTo(60, doc.y + 2)
+     .lineTo(doc.page.width - 60, doc.y + 2)
+     .lineWidth(0.5)
+     .stroke('#dddddd');
+  
+  doc.moveDown(0.6);
 }
 
 // ─── Main generator ───────────────────────────────────────────────────────────
 
 function generateEvidenceReport(scan) {
   return new Promise((resolve, reject) => {
+    console.log('[PDF] Generating report for scan:', scan.id, '| fields:', Object.keys(scan).join(', '));
+
     const doc = new PDFDocument({
       size: 'A4',
       margin: 60,
@@ -76,120 +91,144 @@ function generateEvidenceReport(scan) {
     const verdict = scan.verdict || 'UNCERTAIN';
     const verdictColor = VERDICT_COLORS[verdict] || VERDICT_COLORS.UNCERTAIN;
 
+    // Fallbacks
+    const summary = scan.summary || scan.forensic_summary || 'Analysis complete.';
+    const suspectedModel = scan.suspected_model || 'Not determined';
+    const inputType = (scan.input_type || 'unknown').toUpperCase();
+    const mediaType = scan.media_type 
+      ? scan.media_type.charAt(0).toUpperCase() + scan.media_type.slice(1)
+      : 'Image';
+
     // ───────────────────────────────────────────────────────────────────────
     // HEADER BAND
     // ───────────────────────────────────────────────────────────────────────
 
     doc.save();
-    doc.rect(0, 0, doc.page.width, 80).fill(verdictColor);
+    doc.rect(0, 0, doc.page.width, 100).fill(verdictColor);
 
-    // Left side — branding
-    doc.font('Helvetica-Bold').fontSize(22).fillColor('#ffffff');
-    doc.text('VERITASAI', 30, 18, { lineBreak: false });
-    doc.font('Helvetica').fontSize(10).fillColor('#ffffff');
-    doc.text('AI-GENERATED MEDIA FORENSIC REPORT', 30, 46, { lineBreak: false });
+    const pageTop = 0;
 
-    // Right side — verdict label
-    const verdictLabel = (VERDICT_ICONS[verdict] || '?') + ' ' + (VERDICT_LABELS[verdict] || 'UNKNOWN');
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#ffffff');
-    doc.text(verdictLabel, 300, 22, { width: 220, align: 'right', lineBreak: false });
+    // Left side
+    doc.font('Helvetica-Bold').fontSize(24).fillColor('#ffffff');
+    doc.text('VERITASAI', 60, pageTop + 22, { lineBreak: false });
+    
+    doc.font('Helvetica-Bold').fontSize(9).fillOpacity(0.8).fillColor('#ffffff');
+    doc.text('AI-GENERATED MEDIA FORENSIC REPORT', 60, pageTop + 50, { lineBreak: false });
+    
+    doc.font('Helvetica').fontSize(8).fillOpacity(0.6).fillColor('#ffffff');
+    doc.text('Forensic Analysis Platform', 60, pageTop + 63, { lineBreak: false });
 
-    // Far right — confidence
+    doc.fillOpacity(1); // Reset opacity
+
+    // Center-right — verdict label
+    const verdictLabel = VERDICT_LABELS[verdict] || VERDICT_LABELS.UNCERTAIN;
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff');
+    // Vertically centered around y=40 approximately
+    doc.text(verdictLabel, doc.page.width - 280, pageTop + 42, { width: 180, align: 'right', lineBreak: false });
+
+    // Right side — confidence
     const confStr = (scan.confidence || 0) + '%';
-    doc.font('Helvetica-Bold').fontSize(32).fillColor('#ffffff');
-    doc.text(confStr, doc.page.width - 120, 22, { width: 90, align: 'right', lineBreak: false });
-
+    doc.font('Helvetica-Bold').fontSize(42).fillColor('#ffffff');
+    doc.text(confStr, doc.page.width - 155, pageTop + 24, { width: 90, align: 'right', lineBreak: false });
+    
+    doc.font('Helvetica-Bold').fontSize(8).fillOpacity(0.7).fillColor('#ffffff');
+    doc.text('CONFIDENCE', doc.page.width - 155, pageTop + 68, { width: 90, align: 'right', lineBreak: false });
+    
+    doc.fillOpacity(1); // Reset opacity
     doc.restore();
 
     // ───────────────────────────────────────────────────────────────────────
     // DISCLAIMER
     // ───────────────────────────────────────────────────────────────────────
 
-    doc.y = 95;
+    doc.y = 100;
+    doc.moveDown(1);
+    
     const disclaimerY = doc.y;
+    // Calculate height roughly based on text
+    const disclaimerHeight = 44; 
+    
     doc.save();
-    doc.rect(doc.page.margins.left, disclaimerY, pageWidth, 40)
-       .fill('#1a1f2e');
-    doc.font('Helvetica').fontSize(7).fillColor('#888888');
+    doc.rect(doc.page.margins.left, disclaimerY, pageWidth, disclaimerHeight)
+       .fill('#f5f5f5');
+    
+    doc.font('Helvetica').fontSize(8).fillColor('#666666');
     doc.text(
       'This report is generated by VeritasAI automated forensic analysis and is intended as supporting evidence only. ' +
       'Results are probabilistic, not definitive. Always verify findings with additional sources before taking legal action. ' +
       'VeritasAI (veritasai-g2u6.onrender.com)',
-      doc.page.margins.left + 10, disclaimerY + 8,
+      doc.page.margins.left + 10, disclaimerY + 12,
       { width: pageWidth - 20 }
     );
     doc.restore();
-    doc.y = disclaimerY + 50;
-
-    // ───────────────────────────────────────────────────────────────────────
-    // SECTION HEADING helper
-    // ───────────────────────────────────────────────────────────────────────
-
-    function sectionHeading(title) {
-      doc.moveDown(0.8);
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#00d4ff');
-      doc.text(title);
-      const lineY = doc.y + 2;
-      doc.save();
-      doc.moveTo(doc.page.margins.left, lineY)
-         .lineTo(doc.page.margins.left + pageWidth, lineY)
-         .strokeColor('#00d4ff').lineWidth(0.5).stroke();
-      doc.restore();
-      doc.y = lineY + 8;
-    }
+    
+    doc.y = disclaimerY + disclaimerHeight + 16;
 
     // ───────────────────────────────────────────────────────────────────────
     // SCAN METADATA
     // ───────────────────────────────────────────────────────────────────────
 
-    sectionHeading('SCAN INFORMATION');
+    addSection(doc, 'SCAN INFORMATION');
 
     const metaLeft = [
       ['Scan ID',      scan.id || 'N/A'],
       ['Date',         formatDate(scan.created_at)],
-      ['Media Type',   (scan.media_type || 'image').charAt(0).toUpperCase() + (scan.media_type || 'image').slice(1)],
-      ['Input Method', (scan.input_type || 'url').charAt(0).toUpperCase() + (scan.input_type || 'url').slice(1)],
+      ['Media Type',   mediaType],
+      ['Input Method', inputType],
     ];
 
     const metaRight = [
-      ['Verdict',         verdict],
+      ['Verdict',         VERDICT_META_LABELS[verdict] || verdict],
       ['Confidence',      (scan.confidence || 0) + '%'],
-      ['Suspected Model', scan.suspected_model || 'Not determined'],
+      ['Suspected Model', suspectedModel],
       ['Platform',        'VeritasAI v1.0'],
     ];
 
     const metaStartY = doc.y;
-    const colWidth = pageWidth / 2;
+    const leftColX = 60;
+    const rightColX = 320;
+    const rowHeight = 22;
+
+    // Draw alternating backgrounds
+    const totalRows = Math.max(metaLeft.length, metaRight.length);
+    for (let i = 0; i < totalRows; i++) {
+      if (i % 2 === 0) {
+        doc.save();
+        doc.rect(doc.page.margins.left, metaStartY + (i * rowHeight), pageWidth, 20).fill('#fafafa');
+        doc.restore();
+      }
+    }
 
     metaLeft.forEach(([label, value], i) => {
-      const rowY = metaStartY + i * 16;
+      const rowY = metaStartY + (i * rowHeight) + 6;
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#888888');
-      doc.text(label + ':', doc.page.margins.left, rowY, { width: 90, lineBreak: false });
+      doc.text(label + ':', leftColX, rowY, { width: 90, lineBreak: false });
+      
       const isId = label === 'Scan ID';
-      doc.font(isId ? 'Courier' : 'Helvetica').fontSize(9).fillColor('#cccccc');
-      doc.text(value, doc.page.margins.left + 92, rowY, { width: colWidth - 92, lineBreak: false });
+      doc.font(isId ? 'Courier' : 'Helvetica').fontSize(10).fillColor('#333333');
+      doc.text(value, leftColX + 90, rowY - 1, { width: rightColX - leftColX - 90 - 10, lineBreak: false });
     });
 
     metaRight.forEach(([label, value], i) => {
-      const rowY = metaStartY + i * 16;
-      const xOffset = doc.page.margins.left + colWidth + 10;
+      const rowY = metaStartY + (i * rowHeight) + 6;
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#888888');
-      doc.text(label + ':', xOffset, rowY, { width: 100, lineBreak: false });
+      doc.text(label + ':', rightColX, rowY, { width: 100, lineBreak: false });
+      
       const isVerdict = label === 'Verdict';
-      doc.font('Helvetica-Bold').fontSize(9)
-         .fillColor(isVerdict ? verdictColor : '#cccccc');
-      doc.text(value, xOffset + 102, rowY, { width: colWidth - 112, lineBreak: false });
+      doc.font(isVerdict ? 'Helvetica-Bold' : 'Helvetica').fontSize(10)
+         .fillColor(isVerdict ? verdictColor : '#333333');
+      doc.text(value, rightColX + 100, rowY - 1, { width: doc.page.width - doc.page.margins.right - rightColX - 100, lineBreak: false });
     });
 
-    doc.y = metaStartY + metaLeft.length * 16 + 4;
+    doc.y = metaStartY + (totalRows * rowHeight) + 20;
 
     // ───────────────────────────────────────────────────────────────────────
     // ANALYSIS SUMMARY
     // ───────────────────────────────────────────────────────────────────────
 
-    sectionHeading('ANALYSIS SUMMARY');
-    doc.font('Helvetica').fontSize(10).fillColor('#cccccc');
-    doc.text(scan.summary || 'No summary available.', {
+    addSection(doc, 'ANALYSIS SUMMARY');
+    doc.font('Helvetica').fontSize(10).fillColor('#444444');
+    doc.text(summary, {
       width: pageWidth, lineGap: 3
     });
 
@@ -197,47 +236,62 @@ function generateEvidenceReport(scan) {
     // FORENSIC SIGNALS
     // ───────────────────────────────────────────────────────────────────────
 
-    sectionHeading('FORENSIC SIGNALS DETECTED');
-    doc.font('Helvetica').fontSize(8).fillColor('#888888');
+    addSection(doc, 'FORENSIC SIGNALS DETECTED');
+    doc.font('Helvetica').fontSize(9).fillColor('#666666');
     doc.text('The following signals were identified during analysis:', { width: pageWidth });
-    doc.moveDown(0.5);
+    doc.moveDown(0.8);
 
     const signals = scan.signals || [];
     signals.forEach(signal => {
-      const sevColor = SEVERITY_COLORS[signal.severity] || '#004466';
+      const sevColor = SEVERITY_COLORS[signal.severity] || '#006699';
 
-      // Check if we need a new page (leave 80px for footer + content)
-      if (doc.y > doc.page.height - 120) {
+      // Estimate block height (title + desc lines)
+      doc.font('Helvetica').fontSize(9.5);
+      const descHeight = doc.heightOfString(signal.technical_description || ' ', { width: pageWidth - 24 });
+      const blockHeight = 24 + descHeight + 10;
+
+      // Check if we need a new page
+      if (doc.y + blockHeight > doc.page.height - doc.page.margins.bottom - 40) {
         doc.addPage();
         doc.y = doc.page.margins.top;
       }
 
       const blockY = doc.y;
 
+      // Light background rect
+      doc.save();
+      doc.roundedRect(doc.page.margins.left, blockY, pageWidth, blockHeight, 4).fill('#fafafa');
+      doc.restore();
+
       // Colored left bar
       doc.save();
-      doc.rect(doc.page.margins.left, blockY, 4, 40).fill(sevColor);
+      doc.path(`M ${doc.page.margins.left + 4} ${blockY} 
+                L ${doc.page.margins.left} ${blockY} 
+                L ${doc.page.margins.left} ${blockY + blockHeight} 
+                L ${doc.page.margins.left + 4} ${blockY + blockHeight} Z`)
+         .fill(sevColor);
       doc.restore();
 
       // Signal name
-      doc.font('Helvetica-Bold').fontSize(11).fillColor('#dddddd');
-      doc.text(signal.name || 'Unknown Signal', doc.page.margins.left + 12, blockY, {
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#222222');
+      doc.text(signal.name || 'Unknown Signal', 74, blockY + 10, {
         width: pageWidth - 100, lineBreak: false
       });
 
       // Severity badge
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(sevColor);
-      doc.text('[' + (signal.severity || 'NOTE') + ']', doc.page.margins.left + pageWidth - 80, blockY, {
-        width: 80, align: 'right', lineBreak: false
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(sevColor);
+      doc.text('[' + (signal.severity || 'NOTE') + ']', doc.page.margins.left + pageWidth - 80, blockY + 10, {
+        width: 70, align: 'right', lineBreak: false
       });
 
       // Description
-      doc.font('Helvetica').fontSize(9).fillColor('#aaaaaa');
-      doc.text(signal.technical_description || '', doc.page.margins.left + 12, blockY + 16, {
-        width: pageWidth - 16, lineGap: 2
+      doc.font('Helvetica').fontSize(9.5).fillColor('#444444');
+      doc.text(signal.technical_description || '', 74, blockY + 28, {
+        width: pageWidth - 24, lineGap: 3
       });
 
-      doc.y = Math.max(doc.y, blockY + 40) + 8;
+      doc.y = blockY + blockHeight;
+      doc.moveDown(0.6);
     });
 
     // ───────────────────────────────────────────────────────────────────────
@@ -247,40 +301,39 @@ function generateEvidenceReport(scan) {
     const exp = scan.explanation || {};
 
     if (exp.how_detected || exp.what_to_look_for || exp.technology_note) {
-      // Page break check
-      if (doc.y > doc.page.height - 200) {
+      if (doc.y > doc.page.height - 180) {
         doc.addPage();
         doc.y = doc.page.margins.top;
       }
 
-      sectionHeading('UNDERSTANDING THIS RESULT');
+      addSection(doc, 'UNDERSTANDING THIS RESULT');
 
       if (exp.how_detected) {
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#dddddd');
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
         doc.text('How It Was Detected');
         doc.moveDown(0.3);
-        doc.font('Helvetica').fontSize(9).fillColor('#aaaaaa');
-        doc.text(exp.how_detected, { width: pageWidth, lineGap: 2 });
-        doc.moveDown(0.6);
+        doc.font('Helvetica').fontSize(9.5).fillColor('#444444');
+        doc.text(exp.how_detected, { width: pageWidth, lineGap: 3 });
+        doc.moveDown(0.8);
       }
 
       if (exp.what_to_look_for) {
-        if (doc.y > doc.page.height - 120) { doc.addPage(); doc.y = doc.page.margins.top; }
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#dddddd');
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) { doc.addPage(); doc.y = doc.page.margins.top; }
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
         doc.text('What To Look For Yourself');
         doc.moveDown(0.3);
-        doc.font('Helvetica').fontSize(9).fillColor('#aaaaaa');
-        doc.text(exp.what_to_look_for, { width: pageWidth, lineGap: 2 });
-        doc.moveDown(0.6);
+        doc.font('Helvetica').fontSize(9.5).fillColor('#444444');
+        doc.text(exp.what_to_look_for, { width: pageWidth, lineGap: 3 });
+        doc.moveDown(0.8);
       }
 
       if (exp.technology_note) {
-        if (doc.y > doc.page.height - 120) { doc.addPage(); doc.y = doc.page.margins.top; }
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#dddddd');
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) { doc.addPage(); doc.y = doc.page.margins.top; }
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
         doc.text('About The Technology');
         doc.moveDown(0.3);
-        doc.font('Helvetica').fontSize(9).fillColor('#aaaaaa');
-        doc.text(exp.technology_note, { width: pageWidth, lineGap: 2 });
+        doc.font('Helvetica').fontSize(9.5).fillColor('#444444');
+        doc.text(exp.technology_note, { width: pageWidth, lineGap: 3 });
       }
     }
 
@@ -291,30 +344,33 @@ function generateEvidenceReport(scan) {
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
-      const footerY = doc.page.height - 40;
-
-      // Thin line
-      doc.save();
-      doc.moveTo(doc.page.margins.left, footerY)
-         .lineTo(doc.page.margins.left + pageWidth, footerY)
-         .strokeColor('#333333').lineWidth(0.5).stroke();
-      doc.restore();
-
-      // Left: scan ID
-      doc.font('Courier').fontSize(7).fillColor('#666666');
-      doc.text(
-        'VeritasAI Forensic Report  —  Scan ID: ' + (scan.id || 'N/A'),
-        doc.page.margins.left, footerY + 6,
-        { width: pageWidth - 80, lineBreak: false }
-      );
-
-      // Right: page number
-      doc.font('Helvetica').fontSize(7).fillColor('#666666');
-      doc.text(
-        'Page ' + (i + 1) + ' of ' + totalPages,
-        doc.page.margins.left, footerY + 6,
-        { width: pageWidth, align: 'right', lineBreak: false }
-      );
+      
+      // Draw footer line
+      doc.moveTo(60, doc.page.height - 50)
+         .lineTo(doc.page.width - 60, doc.page.height - 50)
+         .stroke('#cccccc');
+      
+      // Footer left: scan ID
+      doc.font('Courier')
+         .fontSize(8)
+         .fillColor('#888888')
+         .text(
+           'VeritasAI Forensic Report — Scan ID: ' + (scan.id || 'N/A'),
+           60,
+           doc.page.height - 38,
+           { lineBreak: false }
+         );
+      
+      // Footer right: page number
+      doc.font('Helvetica')
+         .fontSize(8)
+         .fillColor('#888888')
+         .text(
+           'Page ' + (i + 1) + ' of ' + totalPages,
+           0,
+           doc.page.height - 38,
+           { align: 'right', width: doc.page.width - 60, lineBreak: false }
+         );
     }
 
     doc.end();
