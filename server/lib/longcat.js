@@ -18,7 +18,7 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 
 const { getDb } = require('./db');
-const { FORENSIC_PROMPT, EDUCATION_PROMPT } = require('./prompts');
+const { FORENSIC_PROMPT, SKEPTIC_PROMPT, EDUCATION_PROMPT } = require('./prompts');
 
 // ─── Endpoint helpers ────────────────────────────────────────────────────────
 
@@ -255,6 +255,130 @@ async function analyzeImage(base64Data, mimeType) {
 }
 
 /**
+ * Analyze an image using the skeptic prompt (defense perspective).
+ * Uses LongCat-Flash-Omni-2603 via the OpenAI-format endpoint.
+ *
+ * @param {string} base64Data – base64-encoded image (no data URI prefix)
+ * @param {string} mimeType   – e.g. "image/jpeg"
+ * @returns {Promise<object>}  – forensic JSON report from skeptic perspective
+ */
+async function analyzeImageSkeptic(base64Data, mimeType) {
+  const body = {
+    model: 'LongCat-Flash-Omni-2603',
+    stream: false,
+    max_tokens: 2000,
+    output_modalities: ["text"],
+    messages: [
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text: SKEPTIC_PROMPT
+          }
+        ]
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_image',
+            input_image: {
+              type: 'base64',
+              data: [base64Data]
+            }
+          },
+          {
+            type: 'text',
+            text: 'Analyze this image and return the forensic JSON report.'
+          }
+        ]
+      }
+    ]
+  };
+
+  return callLongcatOpenAI(body, 'analyzeImageSkeptic');
+}
+
+/**
+ * Dual-prompt verification: runs primary analysis, and if AI_GENERATED with
+ * confidence >= 70, runs a second skeptic analysis to reduce false positives.
+ *
+ * @param {string} base64Data – base64-encoded image (no data URI prefix)
+ * @param {string} mimeType   – e.g. "image/jpeg"
+ * @returns {Promise<object>}  – reconciled forensic JSON report
+ */
+async function analyzeImageWithVerification(base64Data, mimeType) {
+  // Step 1 — Run primary analysis
+  const primary = await analyzeImage(base64Data, mimeType);
+
+  // Step 4 — If primary is not AI_GENERATED, return as-is (saves tokens)
+  if (primary.verdict !== 'AI_GENERATED') {
+    return primary;
+  }
+
+  // Step 2 — If AI_GENERATED with confidence >= 70, run skeptic analysis
+  if (primary.confidence < 70) {
+    return primary;
+  }
+
+  console.log('[Longcat] Primary verdict is AI_GENERATED (confidence: ' + primary.confidence + '%), running skeptic verification...');
+  const skeptic = await analyzeImageSkeptic(base64Data, mimeType);
+  console.log('[Longcat] Skeptic verdict:', skeptic.verdict, '(confidence: ' + skeptic.confidence + '%)');
+
+  // Step 3 — Reconcile results
+  const SEVERITY_RANK = { CRITICAL: 4, WARNING: 3, NOTE: 2, CLEAR: 1 };
+
+  if (skeptic.verdict === 'AI_GENERATED') {
+    // Both agree → keep AI_GENERATED, average confidence, merge signals
+    const avgConfidence = Math.round((primary.confidence + skeptic.confidence) / 2);
+    const signalMap = new Map();
+    for (const sig of (primary.signals || [])) {
+      signalMap.set(sig.name, sig);
+    }
+    for (const sig of (skeptic.signals || [])) {
+      const existing = signalMap.get(sig.name);
+      if (!existing || (SEVERITY_RANK[sig.severity] || 0) > (SEVERITY_RANK[existing.severity] || 0)) {
+        signalMap.set(sig.name, sig);
+      }
+    }
+    return {
+      ...primary,
+      verdict: 'AI_GENERATED',
+      confidence: avgConfidence,
+      signals: [...signalMap.values()]
+    };
+  }
+
+  if (skeptic.verdict === 'AUTHENTIC') {
+    // Disagreement → downgrade to UNCERTAIN
+    const downgradedSignals = (primary.signals || []).map(s => ({
+      ...s,
+      severity: s.severity === 'CRITICAL' ? 'WARNING' : s.severity
+    }));
+    downgradedSignals.push({
+      name: 'Conflicting Analysis',
+      severity: 'NOTE',
+      technical_description: 'Two independent forensic analyses reached different conclusions about this image. Exercise caution before making a determination.'
+    });
+    return {
+      ...primary,
+      verdict: 'UNCERTAIN',
+      confidence: 50,
+      signals: downgradedSignals
+    };
+  }
+
+  // skeptic.verdict === 'UNCERTAIN'
+  return {
+    ...primary,
+    verdict: 'UNCERTAIN',
+    confidence: Math.round((primary.confidence + skeptic.confidence) / 2),
+    signals: primary.signals || []
+  };
+}
+
+/**
  * Generate a plain-language explanation from a forensic JSON report.
  * Uses LongCat-Flash-Chat via the Anthropic-format endpoint.
  *
@@ -321,7 +445,7 @@ async function checkTokenBudget() {
 
 // ─── Module exports ───────────────────────────────────────────────────────────
 
-module.exports = { analyzeImage, generateExplanation, trackTokenUsage, checkTokenBudget };
+module.exports = { analyzeImage, analyzeImageSkeptic, analyzeImageWithVerification, generateExplanation, trackTokenUsage, checkTokenBudget };
 
 // ─── Self-test (run with: node server/lib/longcat.js) ────────────────────────
 

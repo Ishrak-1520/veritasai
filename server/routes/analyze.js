@@ -12,7 +12,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { optionalAuth } = require('../lib/auth');
-const { analyzeImage, generateExplanation, checkTokenBudget } = require('../lib/longcat');
+const { analyzeImage, analyzeImageWithVerification, generateExplanation, checkTokenBudget } = require('../lib/longcat');
 const { extractFrames } = require('../lib/frameExtract');
 
 const router = express.Router();
@@ -78,6 +78,66 @@ function safeDelete(filePath) {
   try {
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
   } catch { /* ignore */ }
+}
+
+/**
+ * Post-processing calibration to reduce false positives and cap overconfidence.
+ */
+function calibrateResult(result) {
+  if (!result || !result.signals) return result;
+
+  const signals = result.signals || [];
+  const criticalCount = signals.filter(s => s.severity === 'CRITICAL').length;
+  const warningCount = signals.filter(s => s.severity === 'WARNING').length;
+  const clearCount = signals.filter(s => s.severity === 'CLEAR').length;
+
+  let { verdict, confidence } = result;
+
+  if (verdict === 'AI_GENERATED') {
+    // Downgrade if evidence is weak
+    if (criticalCount === 0 && warningCount <= 2) {
+      verdict = 'UNCERTAIN';
+      confidence = Math.min(confidence, 60);
+    }
+    // Downgrade if more CLEAR signals than CRITICAL
+    if (clearCount > criticalCount && criticalCount < 2) {
+      verdict = 'UNCERTAIN';
+      confidence = Math.min(confidence, 65);
+    }
+    // Cap overconfident AI verdicts
+    if (criticalCount === 1 && confidence > 80) {
+      confidence = 75;
+    }
+    // Boost well-supported AI verdicts
+    if (criticalCount >= 3) {
+      confidence = Math.max(confidence, 80);
+    }
+  }
+
+  if (verdict === 'AUTHENTIC') {
+    // Downgrade if any CRITICAL signals exist
+    if (criticalCount > 0) {
+      verdict = 'UNCERTAIN';
+      confidence = Math.min(confidence, 65);
+    }
+    // Cap overconfident authentic verdicts
+    if (confidence > 92) confidence = 92;
+    // Boost well-supported authentic verdicts
+    if (clearCount >= 4 && warningCount === 0) {
+      confidence = Math.max(confidence, 85);
+    }
+  }
+
+  if (verdict === 'UNCERTAIN') {
+    // Keep uncertain between 40-65
+    confidence = Math.max(40, Math.min(65, confidence));
+  }
+
+  // Final cap — never 100% confident in either direction
+  confidence = Math.min(confidence, 95);
+  confidence = Math.max(confidence, 10);
+
+  return { ...result, verdict, confidence };
 }
 
 // ─── POST /analyze ──────────────────────────────────────────────────────────
@@ -207,7 +267,7 @@ router.post('/', optionalAuth, async (req, res) => {
     let forensicResult;
 
     if (mediaType === 'image') {
-      forensicResult = await analyzeImage(base64, mimeType);
+      forensicResult = await analyzeImageWithVerification(base64, mimeType);
 
     } else {
       // Video — analyze extracted frames
@@ -264,6 +324,9 @@ router.post('/', optionalAuth, async (req, res) => {
         signals: mergedSignals,
       };
     }
+
+    // ── STEP 6.5: Calibrate result ──────────────────────────────────────
+    forensicResult = calibrateResult(forensicResult);
 
     // ── STEP 7: Education layer ─────────────────────────────────────────
     const explanation = await generateExplanation(forensicResult);
@@ -327,3 +390,4 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.calibrateResult = calibrateResult;
