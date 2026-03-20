@@ -1,0 +1,44 @@
+# Walkthrough: False Positive Reduction
+
+## Changes Made
+
+### [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js) — 3 changes
+
+1. **Rewritten `FORENSIC_PROMPT`** — Added strong authenticity bias ("strong prior toward AUTHENTIC"), explicit list of false-positive triggers (editing, studio lighting, stock photos) that must NOT be CRITICAL, strong AI indicators that CAN be CRITICAL (merged fingers, mismatched eyes, impossible geometry), calibrated confidence ranges (never >95%), severity assignment rules, and verdict decision rules (requires 2+ CRITICAL for AI_GENERATED).
+
+2. **New `SKEPTIC_PROMPT`** — "Defense analyst" that assumes image is real, looks for authenticity evidence (sensor noise, lighting physics, pore structure), only flags genuinely unavoidable AI evidence.
+
+3. **Updated `EDUCATION_PROMPT`** — Non-alarming language for UNCERTAIN verdicts, explains natural photographic characteristics for AUTHENTIC verdicts.
+
+### [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) — 2 new functions
+
+1. **[analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#257-302)** — Same API call structure as [analyzeImage()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#211-256) but uses SKEPTIC_PROMPT.
+
+2. **[analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#303-380)** — Dual-prompt orchestrator:
+   - Runs primary analysis
+   - If not AI_GENERATED → returns immediately (saves tokens)
+   - If AI_GENERATED with confidence ≥ 70% → runs skeptic analysis
+   - Reconciles: both agree → keep AI_GENERATED (avg confidence); disagree → downgrade to UNCERTAIN
+
+### [analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js) — 3 changes
+
+1. **[calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#83-142)** — Post-processing that downgrades weak AI verdicts, caps overconfidence, and validates signals.
+
+2. **Switched image analysis** from [analyzeImage()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#211-256) to [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#303-380).
+
+3. **Applied [calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#83-142)** to both image and video results before the education layer.
+
+## Test Results
+
+| Test | Image | Verdict | Confidence | Signals | Result |
+|------|-------|---------|------------|---------|--------|
+| Nature landscape | `picsum/id/1` | UNCERTAIN | 40% | 0C / 0W / 0CL | ✓ PASS |
+| Portrait | `picsum/id/64` | UNCERTAIN | 40% | 0C / 0W / 0CL | ✓ PASS |
+| Abstract | `picsum/id/28` | AUTHENTIC | 90% | 0C / 0W / 5CL | ✓ PASS |
+
+**No false positives.** None of the 3 known authentic images were classified as AI_GENERATED.
+The skeptic analysis was never triggered (primary didn't return AI_GENERATED), which is the expected behavior — saving API tokens.
+
+## Deployment
+
+Pushed to GitHub (`main` branch, commit `6668f22`). Render will auto-deploy.

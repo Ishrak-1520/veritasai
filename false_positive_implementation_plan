@@ -1,0 +1,68 @@
+# Reduce False Positive Rate in VeritasAI
+
+VeritasAI's forensic pipeline marks authentic images as AI-generated too aggressively. This plan implements defenses at three layers: improved prompts, dual-analysis verification, and post-processing calibration.
+
+## Proposed Changes
+
+### Prompts ([server/lib/prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js))
+
+#### [MODIFY] [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)
+
+1. **Rewrite `FORENSIC_PROMPT`** — Add strong prior toward AUTHENTIC, list common false-positive triggers (editing, studio lighting, stock photos, etc.) as non-reliable indicators, define what IS strong AI evidence (merged fingers, mismatched eyes, impossible geometry), replace confidence scoring with calibrated ranges (never >95%, never <50% for definitive), add severity assignment rules, and add verdict decision rules requiring 2+ CRITICAL for AI_GENERATED.
+
+2. **Add `SKEPTIC_PROMPT`** — New constant for the "defense" analyst role: assumes image is real, looks for authenticity evidence (sensor noise, lighting physics, pore structure), only flags genuinely unavoidable AI evidence.
+
+3. **Update `EDUCATION_PROMPT`** — Add instructions for UNCERTAIN verdicts (non-alarming language, "evidence is mixed") and AUTHENTIC verdicts (explain natural photographic characteristics).
+
+4. **Update exports** to include `SKEPTIC_PROMPT`.
+
+---
+
+### Dual-Prompt Verification ([server/lib/longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js))
+
+#### [MODIFY] [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)
+
+1. **Import `SKEPTIC_PROMPT`** from prompts.js.
+
+2. **Add `analyzeImageSkeptic()`** — Same as [analyzeImage()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#211-256) but uses `SKEPTIC_PROMPT`.
+
+3. **Add `analyzeImageWithVerification()`** — Runs primary analysis, and if verdict is `AI_GENERATED` with confidence ≥ 70, runs skeptic analysis. Reconciles: both agree → keep AI_GENERATED (avg confidence); disagree → downgrade to UNCERTAIN; primary not AI → return as-is.
+
+4. **Export `analyzeImageWithVerification`**.
+
+---
+
+### Confidence Calibration ([server/routes/analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js))
+
+#### [MODIFY] [analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js)
+
+1. **Add `calibrateResult()`** function — Post-processing that downgrades weak AI verdicts (no CRITICAL + ≤2 WARNING → UNCERTAIN), caps overconfident results, and validates authentic verdicts against signal evidence.
+
+2. **Update import** to add `analyzeImageWithVerification`.
+
+3. **Image path**: Replace [analyzeImage(base64, mimeType)](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#211-256) with `analyzeImageWithVerification(base64, mimeType)`.
+
+4. **Apply `calibrateResult()`** to both image and video `forensicResult` before [generateExplanation()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#257-279).
+
+## Verification Plan
+
+### Automated Tests
+
+The existing self-test at the bottom of [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) will be extended. After implementation, run:
+
+```
+node server/lib/longcat.js
+```
+
+This verifies the API pipeline works end-to-end. Additionally, manually test with 3 specific images via `curl` or a test script:
+
+| Test | Image | Expected Verdict | Expected Confidence |
+|------|-------|-------------------|---------------------|
+| 1 | `picsum.photos/id/1/800/600.jpg` | AUTHENTIC | 75-92% |
+| 2 | `picsum.photos/id/64/800/600.jpg` | AUTHENTIC or UNCERTAIN | NOT AI_GENERATED |
+| 3 | `picsum.photos/id/28/800/600.jpg` | AUTHENTIC | 80-92% |
+
+We'll create a test script that fetches each image, runs `analyzeImageWithVerification()`, applies `calibrateResult()`, and reports verdicts, confidences, and signal breakdowns.
+
+### Deployment
+Push to GitHub → Render auto-deploys.

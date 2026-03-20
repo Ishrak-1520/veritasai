@@ -1,0 +1,43 @@
+# Walkthrough: False Positive Reduction
+
+## Changes Made
+
+### First Pass
+
+1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)** — Rewrote `FORENSIC_PROMPT` to add authenticity bias and false-positive exclusions, added SKEPTIC_PROMPT, and updated `EDUCATION_PROMPT`.
+2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#375-420) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#421-518).
+3. **[analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js)** — Implemented confidence calibration via [calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#83-142) and updated image pipeline to use the verification step.
+
+### Second Pass (Empty Signals Fix)
+
+1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js) (FORENSIC_PROMPT)**
+   - Added strict instruction to return between 5 and 8 signals.
+   - Added specific JSON examples for `CLEAR` signals on authentic images (e.g. Skin Texture, Lighting Consistency).
+   - Changed verdict rules to require at least 3 `CLEAR` signals for an `AUTHENTIC` verdict.
+   - Added a clear instruction not to abstain or leave the signals array empty when classifying an authentic image.
+
+### Third Pass (JSON Extraction & Fallback)
+
+1. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) (JSON Repair & Replay)**
+   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-83) string parsing by extracting valid portions from syntax-broken strings.
+   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#84-120) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
+   - Added `FORENSIC_PROMPT_SIMPLE` in [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)
+   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#329-374) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
+
+## Final Test Results
+
+| Test | Image | Verdict | Confidence | Signals | Result |
+|------|-------|---------|------------|---------|--------|
+| Nature landscape | `picsum/id/1` | AUTHENTIC | 85% | 0C / 0W / 6CL | ✓ PASS |
+| Portrait | `picsum/id/64` | AUTHENTIC | 85% | 0C / 0W / 7CL | ✓ PASS |
+| Abstract | `picsum/id/28` | AUTHENTIC | 90% | 0C / 0W / 6CL | ✓ PASS |
+
+**Success:** No false positives. All images were accurately classified as `AUTHENTIC` thanks to robust parsing methods and prompt tweaking. The portrait image successfully received 7 CLEAR signals without failing into gracefully degraded empty fallback responses.
+
+## Deployment
+
+All changes have been committed and pushed to the `main` branch.
+- First Pass Commit: `6668f22`
+- Second Pass Commit: `47b7a26`
+- Third Pass Commit: `524ee01`
+Render will now auto-deploy the latest fixes.

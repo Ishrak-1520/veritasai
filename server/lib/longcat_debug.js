@@ -102,31 +102,27 @@ function extractPartialResult(text) {
   };
   
   // Try to extract verdict
-  const verdictMatch = text.match(/"verdict"\s*:\s*"?(AI_GENERATED|AUTHENTIC|UNCERTAIN)"?/i);
-  if (verdictMatch) result.verdict = verdictMatch[1].toUpperCase();
+  const verdictMatch = text.match(/"verdict"\s*:\s*"?(AI_GENERATED|AUTHENTIC|UNCERTAIN)"?/);
+  if (verdictMatch) result.verdict = verdictMatch[1];
   
   // Try to extract confidence
-  const confMatch = text.match(/"confidence"\s*:\s*(\d+)/i);
+  const confMatch = text.match(/"confidence"\s*:\s*(\d+)/);
   if (confMatch) result.confidence = parseInt(confMatch[1]);
   
   // Try to extract summary
-  const summaryMatch = text.match(/"summary"\s*:\s*"([^"]{10,200})"/i);
+  const summaryMatch = text.match(/"summary"\s*:\s*"([^"]{10,200})"/);
   if (summaryMatch) result.summary = summaryMatch[1];
   
-  // Isolate each signal block based on the "name" field
-  const signalBlocks = text.split(/"name"\s*:\s*/i).slice(1);
-  signalBlocks.forEach((block) => {
-    const nameMatch = block.match(/^"([^"]+)"/);
-    const sevMatch = block.match(/"severity"\s*:\s*"?(CRITICAL|WARNING|NOTE|CLEAR)"?|\[severity\]\s*(CRITICAL|WARNING|NOTE|CLEAR)|<severity>\s*(CRITICAL|WARNING|NOTE|CLEAR)/i);
-    const descMatch = block.match(/"technical_description"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"|\[technical_description\]\s*([^"}\n]+)|<technical_description>\s*([^<"}\n]+)/i);
-    
-    if (nameMatch) {
-      result.signals.push({
-        name: nameMatch[1],
-        severity: sevMatch ? (sevMatch[1] || sevMatch[2] || sevMatch[3]).toUpperCase() : 'NOTE',
-        technical_description: descMatch ? (descMatch[1] || descMatch[2] || descMatch[3]).trim() : 'Signal detected but detailed description could not be parsed.'
-      });
-    }
+  // Try to extract signal names at minimum
+  const signalNames = [...text.matchAll(/"name"\s*:\s*"([^"]+)"/g)];
+  const severities = [...text.matchAll(/"severity"\s*:\s*"?(CRITICAL|WARNING|NOTE|CLEAR)"?/g)];
+  
+  signalNames.forEach((match, i) => {
+    result.signals.push({
+      name: match[1],
+      severity: severities[i]?.[1] || 'NOTE',
+      technical_description: 'Signal detected but detailed description could not be parsed.'
+    });
   });
   
   return result;
@@ -261,12 +257,10 @@ async function callLongcatOpenAI(body, label) {
         return JSON.parse(cleaned);
       } catch (parseError) {
         console.error('[Longcat] JSON repair failed for', label + ':', parseError.message);
-        console.log('[DEBUG RAW]', cleaned);
+        require('fs').writeFileSync('raw_cleaned.json', cleaned, 'utf8');
         // Try partial extraction before giving up
         const partial = extractPartialResult(cleaned);
-        // Only accept the partial result if it managed to extract at least 3 signals,
-        // otherwise let it hit the fallback and retry prompt.
-        if (partial.signals.length >= 3) {
+        if (partial.signals.length > 0 || partial.verdict !== 'UNCERTAIN') {
           console.log('[Longcat] Partial extraction succeeded:', 
             partial.verdict, partial.confidence + '%', 
             partial.signals.length + ' signals');
