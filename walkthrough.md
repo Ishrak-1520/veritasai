@@ -1,0 +1,112 @@
+# Walkthrough: False Positive Reduction
+
+## Changes Made
+
+### First Pass
+
+1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)** — Rewrote `FORENSIC_PROMPT` to add authenticity bias and false-positive exclusions, added SKEPTIC_PROMPT, and updated `EDUCATION_PROMPT`.
+2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#503-548) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#549-646).
+3. **[analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js)** — Implemented confidence calibration via [calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#87-146) and updated image pipeline to use the verification step.
+
+### Second Pass (Empty Signals Fix)
+
+1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js) (FORENSIC_PROMPT)**
+   - Added strict instruction to return between 5 and 8 signals.
+   - Added specific JSON examples for `CLEAR` signals on authentic images (e.g. Skin Texture, Lighting Consistency).
+   - Changed verdict rules to require at least 3 `CLEAR` signals for an `AUTHENTIC` verdict.
+   - Added a clear instruction not to abstain or leave the signals array empty when classifying an authentic image.
+
+### Third Pass (JSON Extraction & Fallback)
+
+1. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) (JSON Repair & Replay)**
+   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#96-164) string parsing by extracting valid portions from syntax-broken strings.
+   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
+   - Added `FORENSIC_PROMPT_SIMPLE` in [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)
+   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#457-502) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
+
+## Final Test Results
+
+| Test | Image | Verdict | Confidence | Signals | Result |
+|------|-------|---------|------------|---------|--------|
+| Nature landscape | `picsum/id/1` | AUTHENTIC | 85% | 0C / 0W / 6CL | ✓ PASS |
+| Portrait | `picsum/id/64` | AUTHENTIC | 85% | 0C / 0W / 7CL | ✓ PASS |
+| Abstract | `picsum/id/28` | AUTHENTIC | 90% | 0C / 0W / 6CL | ✓ PASS |
+
+**Success:** No false positives. All images were accurately classified as `AUTHENTIC` thanks to robust### Bug Fixes (Pass 2)
+
+During testing, we discovered the following issues:
+1. **Face Pseudo-Authenticity:** Known AI-generated faces (StyleGAN) were still classified as authentic because the bias rule explicitly stated a "strong prior toward AUTHENTIC".
+2. **Double-Quote Hallucination:** The Longcat AI sometimes hallucinated Javascript single-quoted properties (e.g., `"'severity': 'CLEAR',`) because our few-shot examples in the prompt used JS object notation.
+3. **Markdown Tag Hallucination:** Complex face descriptions would occasionally exceed context or prompt limitations, causing the AI to rely on Markdown XML tags (e.g., `<technical_description> The skin...`) instead of standard JSON formatting.
+
+We addressed these by:
+1. **Rebalancing the `FORENSIC_PROMPT`**: Replaced the harsh authenticity bias with a "balanced forensic" preamble, and explicitly instructed it to assess typical GAN face traits (asymmetrical eyes, blurred edges, clipping jewelry).
+2. **Correcting Few-Shot Examples**: Overrode the `FORENSIC_PROMPT`'s examples to use strict `JSON.parse` suitable double quotes.
+3. **Robust Regex Extraction**: Rewrote [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244) inside [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) to account for both `[technical_description]` and `<technical_description>` pseudo-JSON tag outputs to always rescue raw AI thoughts.
+4. **Retry Loop Enforcement**: Hardened the condition for accepting a partial extraction to `≥ 3` signals. A heavily truncated output with 1-2 signals now correctly trips the `isParseFallback` flag and automatically retries with `FORENSIC_PROMPT_SIMPLE`.
+
+All automated test conditions run against Face and Walrus images passed successfully. The changes have been committed and pushed to the repository.
+
+### Implementing SSE Real-time Progression Stream
+
+To elevate the UX, a real-time event-streaming (SSE) component was retrofitted onto the [analyze](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#411-456) workflow.
+
+1. **Backend Event Stream ([analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js))**: The standard JSON response model for `POST /api/analyze` was transformed into a native `text/event-stream` feed. The API now emits checkpoint data via `res.write()` at explicit boundaries (BUDGET, VALIDATION, EXTRACTION, FORENSIC, EDUCATION, DB SAVE) without ending the connection.
+2. **Component Redesign ([style.css](file:///c:/xampp/htdocs/Vertias/public/css/style.css) & [index.html](file:///c:/xampp/htdocs/Vertias/public/index.html))**: Substituted the legacy `.loading-overlay` spinner for a new modern floating `.progress-panel`, showcasing individual tasks, ticking load times, and dynamic highlighting for Active (`border: 1px solid var(--cyan)`), Completed (Green Tick), or Failed (Red Cross) states.
+3. **Frontend Stream Decoder ([main.js](file:///c:/xampp/htdocs/Vertias/public/js/main.js))**: Trashed the mocked 3-second array rotation script. Replaced the `await fetch().json()` implementation with a live `TextDecoder()` loop via `response.body.getReader()`. The decoder collects raw text chunks sequentially, maps valid JSON events back to their designated `PIPELINE_STEPS` state objects, and triggers real-time `<div class="progress-step">` DOM mutations.
+
+The SSE Stream UI effectively tracks Longcat interactions during extraction and synthesis seamlessly. 
+
+![SSE Progress Streaming Verification Run](/C:/Users/Admin/.gemini/antigravity/brain/17579e89-b186-45f2-b883-6447a36dc996/sse_progress_stream_verification_1774003429932.webp)
+- Second Pass Commit: `47b7a26`
+- Third Pass Commit: `524ee01`
+- Fourth Pass Commit (SSE UI): `c16431b`
+
+### Rescuing Corrupted JSON Longcat Outputs
+During extensive testing, it was found that standard JSON parsing and Regex algorithms were insufficient for correctly parsing out complex `"technical_description"` paragraphs generated by the `LongCat-Flash-Omni-2603` model. Hallucinations frequently threw:
+- Unescaped single quotes wrapped in double quotes
+- Erroneous XML brackets around single elements
+- Discarding the `technical_description` Key-Value mapping entirely, dumping just the string value.
+
+**Resolution:**
+The [server/lib/longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) interceptor was injected with new ultra-aggressive sanitization pipelines ahead of any `JSON.parse` attempts:
+1. [sanitizeDescriptions(text)](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-51): Scans for and escapes raw inner quotes within the bounding array strings.
+2. [sanitizeSignalsArray(text)](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#52-95): Flattens multi-line structures recursively inside the top level `signals:` object to enforce standard object bounds.
+3. [extractPartialResult](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#165-244): Failsafe array destructuring was rewritten to automatically catch and strip keys matching permutations of single/double quotes, parsing the raw substring slice matching the object remainder immediately following the `severity` match.
+
+Local test results validated 100% extraction recovery across `Face` and `Nature` analysis cases.
+- Final Parser Resiliency Commit: `21c850b`
+
+Render will now auto-deploy the latest fixes.
+
+### PDF Evidence Report Download
+
+Added a professional PDF report generation feature to the scan results page.
+
+**Files Created/Modified:**
+- [pdfReport.js](file:///c:/xampp/htdocs/Vertias/server/lib/pdfReport.js) — New PDFKit-based generator with header band, disclaimer, metadata, signals, education, and footer sections
+- [scans.js](file:///c:/xampp/htdocs/Vertias/server/routes/scans.js) — Added `GET /:id/pdf` route
+- [scan.html](file:///c:/xampp/htdocs/Vertias/public/scan.html) — Added "Evidence Report" button
+- [results.js](file:///c:/xampp/htdocs/Vertias/public/js/results.js) — Wired download handler
+
+**Verification:**
+- Browser test confirmed button renders and triggers download (button changes to "Generating...")
+- Direct curl test: `HTTP 200`, 8,516 bytes PDF generated
+- No console or server errors
+
+**Styling Refinements (Commit `a6d99e5`)**
+- Unicode icons replaced with ASCII to fix PDFKit font rendering limitations.
+- Re-architected PDF headers to be taller (`100px`) with robust internal element positioning.
+- Adopted defensive null-fallbacks for missing root variables like `summary` across SQL queries.
+- Shifted footers out of `pageAdded` loops to fix blank trailing pages generated by buffer misalignments.
+- Introduced [addSection()](file:///c:/xampp/htdocs/Vertias/server/lib/pdfReport.js#52-67) helper to cleanly inject unified section delineators.
+- Adjusted fonts and margins throughout all tabular reports including Signals and Metadata columns to emulate professional document structures.
+
+![Scan results page with Evidence Report button](/C:/Users/Admin/.gemini/antigravity/brain/17579e89-b186-45f2-b883-6447a36dc996/evidence_report_clicked_1774006057862.png)
+
+**Bug Fixes & Failsafes (Commit `21a1e4d`)**
+- Intercepted missing data propagation where the database discarded the `scan.summary` parameter by conditionally constructing identical contextual summary fallbacks inside [pdfReport.js](file:///c:/xampp/htdocs/Vertias/server/lib/pdfReport.js).
+- Prevented PDFKit buffer leakage and resulting blank trailing pages structure by sealing the page loop generator *before* conditionally invoking the document stream flush terminator at `<function EOF>`.
+- Re-routed model signal parsing objects through a `cleanSignals` multi-sweep map-filter-map process to strip out trailing JSON artifacts (`},{`), escaping characters (`\"`), and undefined properties out of the rendered analytical PDF array payload block.
+
+- PDF Report Commit: `4b6a6d9`

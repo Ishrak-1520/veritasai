@@ -387,50 +387,60 @@ function generateEvidenceReport(scan) {
     // FOOTER on every page
     // ───────────────────────────────────────────────────────────────────────
 
-    // === DO NOT CALL doc.end() YET ===
-    
-    // Add footers to all pages
-    const range = doc.bufferedPageRange();
-    const totalPages = range.count;
-    
-    console.log('[PDF] Pages before footer:', totalPages);
-    console.log('[PDF] doc already ended?', doc._ended || 'unknown');
-    
-    for (let i = 0; i < totalPages; i++) {
-      doc.switchToPage(i);
-      
-      const footerY = doc.page.height - 45;
-      
-      // Footer line
-      doc.moveTo(60, footerY - 8)
-         .lineTo(doc.page.width - 60, footerY - 8)
+    // ── FOOTERS ──────────────────────────────────────
+    // Must happen after all content, before doc.end()
+    const pageRange = doc.bufferedPageRange();
+    const pageCount = pageRange.count;
+    console.log('[PDF] Total content pages:', pageCount);
+  
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+      doc.switchToPage(pageIndex);
+  
+      const pageBottom = doc.page.height - 50;
+      const pageLeft = 60;
+      const pageRight = doc.page.width - 60;
+  
+      // Horizontal line above footer
+      doc.save();
+      doc.moveTo(pageLeft, pageBottom)
+         .lineTo(pageRight, pageBottom)
          .lineWidth(0.5)
-         .stroke('#cccccc');
-      
-      // Footer left: scan ID
+         .strokeColor('#cccccc')
+         .stroke();
+      doc.restore();
+  
+      // Left: Scan ID in Courier
+      doc.save();
       doc.font('Courier')
          .fontSize(7)
          .fillColor('#999999')
          .text(
-           'VeritasAI Forensic Report — Scan ID: ' + (scan.id || 'N/A'),
-           60,
-           footerY,
-           { lineBreak: false }
+           'VeritasAI — Scan: ' + (scan.id || 'N/A'),
+           pageLeft,
+           pageBottom + 8,
+           { lineBreak: false, width: 300 }
          );
-      
-      // Footer right: page number
+      doc.restore();
+  
+      // Right: Page number in Helvetica
+      doc.save();
       doc.font('Helvetica')
          .fontSize(7)
          .fillColor('#999999')
          .text(
-           'Page ' + (i + 1) + ' of ' + totalPages,
-           60,
-           footerY,
-           { align: 'right', width: doc.page.width - 120, lineBreak: false }
+           'Page ' + (pageIndex + 1) + ' of ' + pageCount,
+           pageLeft,
+           pageBottom + 8,
+           { 
+             lineBreak: false, 
+             width: pageRight - pageLeft,
+             align: 'right' 
+           }
          );
+      doc.restore();
     }
-    
-    // === NOW call doc.end() — AFTER the footer loop ===
+  
+    // ONE AND ONLY doc.end() call — absolutely last line
     doc.end();
   });
 }
