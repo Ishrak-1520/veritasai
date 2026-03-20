@@ -1,0 +1,44 @@
+{
+  "verdict": "AUTHENTIC",
+  "confidence": 89,
+  "summary": "The image shows consistent authentic characteristics with natural lighting, realistic textures, and plausible object interactions. No definitive AI artifacts were detected across multiple forensic dimensions.",
+  "suspected_model": null,
+  "generation_technique": null,
+  "signals": [
+    {
+      "name": "Hand and Finger Anatomy",
+      "severity": "CLEAR",
+      "technical_description": "Both hands show correct finger count, natural joint proportions, and plausible typing posture. No merged digits or anatomical anomalies detected."
+    },
+    {
+      "name": "Skin Texture",
+      "severity": "CLEAR",
+      "technical_description": "Visible skin on hands and neck shows natural texture variation with appropriate pore structure and micro-detail consistent with real photography."
+    },
+    {
+      "name": "Lighting Consistency",
+      "severity": "CLEAR",
+      "technical_description": "Shadows and highlights are consistent with a single natural light source from the upper left. Specular reflections on watch face and cup follow expected physics."
+    },
+    {
+      "name": "Background Plausibility",
+      "severity": "CLEAR",
+      "technical_description": "Outdoor setting with wooden table, smartphone, notebook, and coffee cup forms a coherent and realistic scene. Depth of field transitions are consistent with real camera optics."
+    },
+    {
+      "name": "Edge Artifacts",
+      "severity": "CLEAR",
+      "technical_description": "Subject boundaries show natural blur consistent with shallow depth of field. No halo effects, composite seams, or unnatural edge sharpening detected."
+    },
+    {
+      "name": "Object Interaction",
+      "severity": "CLEAR",
+      "technical_description": "Hands are properly positioned on keyboard with natural finger placement. Watch strap fits correctly around wrist without clipping or distortion."
+    },
+    {
+      "name": "Material Rendering",
+      "severity": "CLEAR",
+      "technical_description": "Wood grain on table, fabric texture of clothing, and metallic sheen on watch face all show appropriate material properties and surface detail."
+    }
+  ]
+}

@@ -5,7 +5,7 @@
 ### First Pass
 
 1. **[prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)** — Rewrote `FORENSIC_PROMPT` to add authenticity bias and false-positive exclusions, added SKEPTIC_PROMPT, and updated `EDUCATION_PROMPT`.
-2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#375-420) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#421-518).
+2. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js)** — Implemented dual-prompt verification via [analyzeImageSkeptic()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#393-438) and [analyzeImageWithVerification()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#439-536).
 3. **[analyze.js](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js)** — Implemented confidence calibration via [calibrateResult()](file:///c:/xampp/htdocs/Vertias/server/routes/analyze.js#83-142) and updated image pipeline to use the verification step.
 
 ### Second Pass (Empty Signals Fix)
@@ -19,10 +19,10 @@
 ### Third Pass (JSON Extraction & Fallback)
 
 1. **[longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) (JSON Repair & Replay)**
-   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-83) string parsing by extracting valid portions from syntax-broken strings.
-   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#84-120) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
+   - Strengthened [repairJson()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#31-93) string parsing by extracting valid portions from syntax-broken strings.
+   - Added [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#94-134) to try to pull verdicts, confidence, and minimum-viable structures out of completely irreparable API responses.
    - Added `FORENSIC_PROMPT_SIMPLE` in [prompts.js](file:///c:/xampp/htdocs/Vertias/server/lib/prompts.js)
-   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#329-374) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
+   - Added [analyzeImageSimple()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#347-392) to [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) and hooked it into the verification response logic to query again with simplified output parameters if the parse fallback detected an `UNCERTAIN` classification with ≤ 1 signal.
 
 ## Final Test Results
 
@@ -32,12 +32,20 @@
 | Portrait | `picsum/id/64` | AUTHENTIC | 85% | 0C / 0W / 7CL | ✓ PASS |
 | Abstract | `picsum/id/28` | AUTHENTIC | 90% | 0C / 0W / 6CL | ✓ PASS |
 
-**Success:** No false positives. All images were accurately classified as `AUTHENTIC` thanks to robust parsing methods and prompt tweaking. The portrait image successfully received 7 CLEAR signals without failing into gracefully degraded empty fallback responses.
+**Success:** No false positives. All images were accurately classified as `AUTHENTIC` thanks to robust### Bug Fixes (Pass 2)
 
-## Deployment
+During testing, we discovered the following issues:
+1. **Face Pseudo-Authenticity:** Known AI-generated faces (StyleGAN) were still classified as authentic because the bias rule explicitly stated a "strong prior toward AUTHENTIC".
+2. **Double-Quote Hallucination:** The Longcat AI sometimes hallucinated Javascript single-quoted properties (e.g., `"'severity': 'CLEAR',`) because our few-shot examples in the prompt used JS object notation.
+3. **Markdown Tag Hallucination:** Complex face descriptions would occasionally exceed context or prompt limitations, causing the AI to rely on Markdown XML tags (e.g., `<technical_description> The skin...`) instead of standard JSON formatting.
 
-All changes have been committed and pushed to the `main` branch.
-- First Pass Commit: `6668f22`
+We addressed these by:
+1. **Rebalancing the `FORENSIC_PROMPT`**: Replaced the harsh authenticity bias with a "balanced forensic" preamble, and explicitly instructed it to assess typical GAN face traits (asymmetrical eyes, blurred edges, clipping jewelry).
+2. **Correcting Few-Shot Examples**: Overrode the `FORENSIC_PROMPT`'s examples to use strict `JSON.parse` suitable double quotes.
+3. **Robust Regex Extraction**: Rewrote [extractPartialResult()](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js#94-134) inside [longcat.js](file:///c:/xampp/htdocs/Vertias/server/lib/longcat.js) to account for both `[technical_description]` and `<technical_description>` pseudo-JSON tag outputs to always rescue raw AI thoughts.
+4. **Retry Loop Enforcement**: Hardened the condition for accepting a partial extraction to `≥ 3` signals. A heavily truncated output with 1-2 signals now correctly trips the `isParseFallback` flag and automatically retries with `FORENSIC_PROMPT_SIMPLE`.
+
+All automated test conditions run against Face and Walrus images passed successfully. The changes have been committed and pushed to the repository.t Pass Commit: `6668f22`
 - Second Pass Commit: `47b7a26`
 - Third Pass Commit: `524ee01`
 Render will now auto-deploy the latest fixes.

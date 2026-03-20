@@ -2,22 +2,86 @@
    main.js — Homepage logic (index.html only)
    ─────────────────────────────────────────────────── */
 
-var LOADING_MESSAGES = [
-  'Initializing scan...',
-  'Analyzing visual artifacts...',
-  'Checking facial geometry...',
-  'Evaluating lighting consistency...',
-  'Running semantic analysis...',
-  'Detecting generation signatures...',
-  'Generating forensic report...',
-  'Preparing educational breakdown...',
-  'Still processing, please wait...',
-  'Cross-checking results...',
-  'Almost done...'
+var selectedFile = null;
+
+const PIPELINE_STEPS = [
+  { key: 'BUDGET',   label: 'Checking daily budget'      },
+  { key: 'VALIDATE', label: 'Validating input'           },
+  { key: 'FETCH',    label: 'Fetching media'             },
+  { key: 'EXTRACT',  label: 'Extracting video frames'    },
+  { key: 'FORENSIC', label: 'Running forensic analysis'  },
+  { key: 'EDUCATION',label: 'Generating explanation'     },
+  { key: 'SAVING',   label: 'Saving results'             },
+  { key: 'COMPLETE', label: 'Analysis complete'          }
 ];
 
-var loadingInterval = null;
-var selectedFile = null;
+const stepStartTimes = {};
+
+function initProgressUI() {
+  const container = document.getElementById('progressSteps');
+  container.innerHTML = '';
+  PIPELINE_STEPS.forEach((step, i) => {
+    const div = document.createElement('div');
+    div.className = 'progress-step waiting';
+    div.id = 'step-' + step.key;
+    div.innerHTML = `
+      <div class="step-icon">${i + 1}</div>
+      <div class="step-label">${step.label}</div>
+      <div class="step-time" id="time-${step.key}"></div>
+    `;
+    container.appendChild(div);
+  });
+  document.getElementById('progressBarFill').style.width = '0%';
+  document.getElementById('progressSubtitle').textContent = 'Starting...';
+}
+
+function setStepActive(key, label) {
+  const el = document.getElementById('step-' + key);
+  if (!el) return;
+  el.className = 'progress-step active';
+  if (label) el.querySelector('.step-label').textContent = label;
+  stepStartTimes[key] = Date.now();
+  document.getElementById('progressSubtitle').textContent = label || el.querySelector('.step-label').textContent;
+}
+
+function setStepDone(key) {
+  const el = document.getElementById('step-' + key);
+  if (!el) return;
+  el.className = 'progress-step done';
+  el.querySelector('.step-icon').textContent = '✓';
+  if (stepStartTimes[key]) {
+    const elapsed = ((Date.now() - stepStartTimes[key]) / 1000).toFixed(1);
+    document.getElementById('time-' + key).textContent = elapsed + 's';
+  }
+}
+
+function setStepError(key) {
+  const el = document.getElementById('step-' + key);
+  if (!el) return;
+  el.className = 'progress-step error';
+  el.querySelector('.step-icon').textContent = '✗';
+}
+
+function updateProgressBar(step, total) {
+  const pct = Math.round((step / total) * 100);
+  document.getElementById('progressBarFill').style.width = pct + '%';
+}
+
+function showLoadingOverlay() {
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('analyzeBtn').disabled = true;
+}
+
+function hideLoadingOverlay() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  document.getElementById('analyzeBtn').disabled = false;
+  updateAnalyzeBtnState();
+}
+
+function getStepKeyByNumber(stepNum) {
+  const keys = ['BUDGET','VALIDATE','FETCH','EXTRACT','FORENSIC','EDUCATION','SAVING','COMPLETE'];
+  return keys[stepNum - 1] || 'COMPLETE';
+}
 
 document.addEventListener('DOMContentLoaded', function () {
   document.body.classList.add('loaded');
@@ -163,93 +227,127 @@ function setupAnalyzeBtn() {
 
 async function handleAnalyze() {
   hideError('formError');
-  var isUrlTab = document.getElementById('tabUrl').classList.contains('active');
-
+  const isUrlTab = document.getElementById('tabUrl').classList.contains('active');
+  
+  let requestBody;
+  
   if (isUrlTab) {
-    var url = document.getElementById('urlInput').value.trim();
+    const url = document.getElementById('urlInput').value.trim();
     if (!url) {
       showError('formError', 'Please enter a URL.');
       return;
     }
-    startLoading();
-    try {
-      var res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ type: 'url', url: url })
-      });
-      var data = await res.json();
-      if (res.ok) {
-        window.location.href = '/scan.html?id=' + data.scanId;
-      } else {
-        stopLoading();
-        showError('formError', data.error || 'Analysis failed. Please try again.');
-      }
-    } catch (err) {
-      stopLoading();
-      showError('formError', 'Network error. Please check your connection.');
-    }
+    requestBody = { type: 'url', url };
   } else {
     if (!selectedFile) {
       showError('formError', 'Please select a file.');
       return;
     }
-    startLoading();
+    
+    // Show overlay early for upload
+    initProgressUI();
+    showLoadingOverlay();
+    setStepActive('VALIDATE', 'Uploading file...');
+    
     try {
-      updateLoadingText('Uploading file...');
-      var formData = new FormData();
+      const formData = new FormData();
       formData.append('file', selectedFile);
-
-      var headers = uploadAuthHeaders();
-
-      var uploadRes = await fetch('/api/upload', {
+      const uploadRes = await fetch('/api/upload', {
         method: 'POST',
-        headers: headers,
+        headers: uploadAuthHeaders(),
         body: formData
       });
-      var uploadData = await uploadRes.json();
+      const uploadData = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-
-      updateLoadingText('Analyzing media...');
-      var analyzeRes = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ type: 'upload', tempFileId: uploadData.tempFileId })
-      });
-      var analyzeData = await analyzeRes.json();
-      if (analyzeRes.ok) {
-        window.location.href = '/scan.html?id=' + analyzeData.scanId;
-      } else {
-        throw new Error(analyzeData.error || 'Analysis failed');
-      }
+      setStepDone('VALIDATE');
+      requestBody = { type: 'upload', tempFileId: uploadData.tempFileId };
     } catch (err) {
-      stopLoading();
+      setStepError('VALIDATE');
+      hideLoadingOverlay();
       showError('formError', err.message);
+      return;
     }
   }
-}
-
-/* ── Loading Overlay ───────────────────────────────── */
-
-function startLoading() {
-  document.getElementById('loadingOverlay').classList.remove('hidden');
-  document.getElementById('analyzeBtn').disabled = true;
-  var idx = 0;
-  updateLoadingText(LOADING_MESSAGES[0]);
-  loadingInterval = setInterval(function () {
-    idx = (idx + 1) % LOADING_MESSAGES.length;
-    updateLoadingText(LOADING_MESSAGES[idx]);
-  }, 3000);
-}
-
-function stopLoading() {
-  document.getElementById('loadingOverlay').classList.add('hidden');
-  clearInterval(loadingInterval);
-  loadingInterval = null;
-  updateAnalyzeBtnState();
-}
-
-function updateLoadingText(text) {
-  var el = document.getElementById('loadingText');
-  if (el) el.textContent = text;
+  
+  // Now start the SSE stream
+  initProgressUI();
+  showLoadingOverlay();
+  
+  let currentStepKey = null;
+  
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (!response.ok && !response.body) {
+      throw new Error('Server error: ' + response.status);
+    }
+    
+    // Read the SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      
+      // Process complete SSE messages (split on double newline)
+      const messages = buffer.split('\n\n');
+      buffer = messages.pop(); // keep incomplete last chunk
+      
+      for (const message of messages) {
+        if (!message.trim()) continue;
+        const line = message.replace(/^data: /, '').trim();
+        if (!line) continue;
+        
+        try {
+          const event = JSON.parse(line);
+          
+          if (event.error) {
+            // Handle error event
+            if (currentStepKey) setStepError(currentStepKey);
+            hideLoadingOverlay();
+            showError('formError', event.message || 'Analysis failed.');
+            return;
+          }
+          
+          if (event.done && event.result) {
+            // Complete — set last step done and redirect
+            setStepDone('COMPLETE');
+            updateProgressBar(8, 8);
+            
+            // Wait briefly so user sees completion
+            await new Promise(r => setTimeout(r, 800));
+            hideLoadingOverlay();
+            window.location.href = '/scan.html?id=' + event.result.scanId;
+            return;
+          }
+          
+          // Otherwise it's a progress step:
+          const stepKey = getStepKeyByNumber(event.step);
+          
+          // Mark previous step as done
+          if (currentStepKey && currentStepKey !== stepKey) {
+            setStepDone(currentStepKey);
+          }
+          
+          // Set current step active
+          currentStepKey = stepKey;
+          setStepActive(stepKey, event.label);
+          updateProgressBar(event.step - 1, event.total);
+        } catch (parseErr) {
+          console.warn('Could not parse SSE message:', line);
+        }
+      }
+    }
+  } catch (err) {
+    hideLoadingOverlay();
+    showError('formError', err.message || 'Network error. Check your connection.');
+  }
 }

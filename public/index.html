@@ -23,8 +23,20 @@
 </nav>
 
 <div class="loading-overlay hidden" id="loadingOverlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text" id="loadingText">Initializing scan...</div>
+  <div class="progress-panel">
+    <div class="progress-header">
+      <div class="spinner"></div>
+      <div>
+        <div class="progress-title">Forensic Analysis</div>
+        <div class="progress-subtitle" id="progressSubtitle">
+          Initializing...</div>
+      </div>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressBarFill"></div>
+    </div>
+    <div class="progress-steps" id="progressSteps"></div>
+  </div>
 </div>
 
 <div class="main-content">

@@ -80,6 +80,10 @@ function safeDelete(filePath) {
   } catch { /* ignore */ }
 }
 
+function sendEvent(res, data) {
+  res.write('data: ' + JSON.stringify(data) + '\n\n');
+}
+
 /**
  * Post-processing calibration to reduce false positives and cap overconfidence.
  */
@@ -143,49 +147,76 @@ function calibrateResult(result) {
 // ─── POST /analyze ──────────────────────────────────────────────────────────
 
 router.post('/', optionalAuth, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const STEPS = {
+    BUDGET:     { step: 1, total: 8, label: 'Checking daily budget...' },
+    VALIDATE:   { step: 2, total: 8, label: 'Validating input...' },
+    FETCH:      { step: 3, total: 8, label: 'Fetching media...' },
+    EXTRACT:    { step: 4, total: 8, label: 'Extracting video frames...' },
+    FORENSIC:   { step: 5, total: 8, label: 'Running forensic analysis...' },
+    EDUCATION:  { step: 6, total: 8, label: 'Generating explanation...' },
+    SAVING:     { step: 7, total: 8, label: 'Saving results...' },
+    COMPLETE:   { step: 8, total: 8, label: 'Analysis complete!' }
+  };
+
   const filesToCleanup = [];
 
   try {
     // ── STEP 1: Budget check ────────────────────────────────────────────
+    sendEvent(res, { ...STEPS.BUDGET, done: false });
     const budgetOk = await checkTokenBudget();
     if (!budgetOk) {
-      return res.status(429).json({ error: 'Daily analysis limit reached. Resets at midnight.' });
+      sendEvent(res, { error: true, message: 'Daily analysis limit reached. Resets at midnight.' });
+      return res.end();
     }
 
     // ── STEP 2: Input validation ────────────────────────────────────────
+    sendEvent(res, { ...STEPS.VALIDATE, done: false });
     const { type } = req.body;
     let { url, tempFileId } = req.body;
 
     if (type !== 'url' && type !== 'upload') {
-      return res.status(400).json({ error: 'type must be url or upload' });
+      sendEvent(res, { error: true, message: 'type must be url or upload' });
+      return res.end();
     }
     if (type === 'url' && (!url || !url.trim())) {
-      return res.status(400).json({ error: 'url is required' });
+      sendEvent(res, { error: true, message: 'url is required' });
+      return res.end();
     }
     if (type === 'upload' && !tempFileId) {
-      return res.status(400).json({ error: 'tempFileId is required' });
+      sendEvent(res, { error: true, message: 'tempFileId is required' });
+      return res.end();
     }
 
     // ── STEP 2.5: Input sanitization ────────────────────────────────────
     if (type === 'url') {
       url = url.trim();
       if (url.length > 2000) {
-        return res.status(400).json({ error: 'URL too long' });
+        sendEvent(res, { error: true, message: 'URL too long' });
+        return res.end();
       }
     }
     if (type === 'upload') {
       tempFileId = String(tempFileId).trim();
       if (!/^[a-zA-Z0-9_\-.]+$/.test(tempFileId)) {
-        return res.status(400).json({ error: 'Invalid file ID' });
+        sendEvent(res, { error: true, message: 'Invalid file ID' });
+        return res.end();
       }
     }
 
     // ── STEP 3: SSRF protection ─────────────────────────────────────────
     if (type === 'url' && !validateUrl(url)) {
-      return res.status(400).json({ error: 'URL not allowed' });
+      sendEvent(res, { error: true, message: 'URL not allowed' });
+      return res.end();
     }
 
     // ── STEP 4: Media loading ───────────────────────────────────────────
+    sendEvent(res, { ...STEPS.FETCH, done: false });
     let base64, mimeType, mediaType, inputValue;
     let tempFilePath = null;
 
@@ -201,16 +232,19 @@ router.post('/', optionalAuth, async (req, res) => {
       } catch (err) {
         clearTimeout(timeout);
         console.error('[Analyze] URL fetch failed:', err.message);
-        return res.status(400).json({ error: 'Could not fetch URL' });
+        sendEvent(res, { error: true, message: 'Could not fetch URL' });
+        return res.end();
       }
 
       if (!response.ok) {
-        return res.status(400).json({ error: 'Could not fetch URL' });
+        sendEvent(res, { error: true, message: 'Could not fetch URL' });
+        return res.end();
       }
 
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('image') && !contentType.includes('video')) {
-        return res.status(400).json({ error: 'URL must point to an image or video file' });
+        sendEvent(res, { error: true, message: 'URL must point to an image or video file' });
+        return res.end();
       }
 
       const buffer = Buffer.from(await response.arrayBuffer());
@@ -231,7 +265,8 @@ router.post('/', optionalAuth, async (req, res) => {
       // type === 'upload'
       const filePath = path.join(UPLOAD_DIR, tempFileId);
       if (!fs.existsSync(filePath)) {
-        return res.status(400).json({ error: 'Uploaded file not found' });
+        sendEvent(res, { error: true, message: 'Uploaded file not found' });
+        return res.end();
       }
 
       tempFilePath = filePath;
@@ -242,7 +277,8 @@ router.post('/', optionalAuth, async (req, res) => {
       const { fileTypeFromBuffer } = await import('file-type');
       const ft = await fileTypeFromBuffer(buffer);
       if (!ft) {
-        return res.status(400).json({ error: 'Cannot determine file type' });
+        sendEvent(res, { error: true, message: 'Cannot determine file type' });
+        return res.end();
       }
 
       mimeType = ft.mime;
@@ -255,11 +291,13 @@ router.post('/', optionalAuth, async (req, res) => {
     let frames = null;
 
     if (mediaType === 'video') {
+      sendEvent(res, { ...STEPS.EXTRACT, done: false });
       try {
         frames = await extractFrames(tempFilePath);
       } catch (err) {
         console.error('[Analyze] Frame extraction failed:', err.message);
-        return res.status(500).json({ error: 'Video frame extraction failed' });
+        sendEvent(res, { error: true, message: 'Video frame extraction failed' });
+        return res.end();
       }
     }
 
@@ -267,13 +305,16 @@ router.post('/', optionalAuth, async (req, res) => {
     let forensicResult;
 
     if (mediaType === 'image') {
+      sendEvent(res, { ...STEPS.FORENSIC, label: 'Analyzing image with AI vision model...', done: false });
       forensicResult = await analyzeImageWithVerification(base64, mimeType);
 
     } else {
       // Video — analyze extracted frames
-      const frameResults = await Promise.all(
-        frames.map((f) => analyzeImage(f.base64, f.mimeType))
-      );
+      const frameResults = [];
+      for (let i = 0; i < frames.length; i++) {
+        sendEvent(res, { ...STEPS.FORENSIC, label: 'Analyzing frame ' + (i+1) + ' of ' + frames.length + '...', done: false });
+        frameResults.push(await analyzeImage(frames[i].base64, frames[i].mimeType));
+      }
 
       // Aggregate verdict
       const aiFrames = frameResults.filter((r) => r.verdict === 'AI_GENERATED');
@@ -329,9 +370,11 @@ router.post('/', optionalAuth, async (req, res) => {
     forensicResult = calibrateResult(forensicResult);
 
     // ── STEP 7: Education layer ─────────────────────────────────────────
+    sendEvent(res, { ...STEPS.EDUCATION, done: false });
     const explanation = await generateExplanation(forensicResult);
 
     // ── STEP 8: Save to database ────────────────────────────────────────
+    sendEvent(res, { ...STEPS.SAVING, done: false });
     const { nanoid } = await import('nanoid');
     const scanId = nanoid(12);
     const { getDb } = require('../lib/db');
@@ -368,19 +411,28 @@ router.post('/', optionalAuth, async (req, res) => {
     });
 
     // ── STEP 9: Respond ─────────────────────────────────────────────────
-    res.json({
-      scanId,
-      verdict: forensicResult.verdict,
-      confidence: forensicResult.confidence,
-      summary: forensicResult.summary,
-      suspected_model: forensicResult.suspected_model,
-      signals: forensicResult.signals,
-      explanation,
+    sendEvent(res, { 
+      ...STEPS.COMPLETE, 
+      done: true, 
+      result: {
+        scanId,
+        verdict: forensicResult.verdict,
+        confidence: forensicResult.confidence,
+        summary: forensicResult.summary,
+        suspected_model: forensicResult.suspected_model,
+        signals: forensicResult.signals,
+        explanation
+      }
     });
+    res.end();
 
   } catch (err) {
     console.error('[Analyze] Pipeline error:', err.message, '|', err.code || '');
-    res.status(500).json({ error: 'Analysis failed. Please try again.' });
+    sendEvent(res, { 
+      error: true, 
+      message: err.message || 'Analysis failed. Please try again.' 
+    });
+    res.end();
   } finally {
     // ── Cleanup ───────────────────────────────────────────────────────
     for (const fp of filesToCleanup) {
