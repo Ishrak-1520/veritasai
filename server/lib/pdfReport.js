@@ -92,7 +92,14 @@ function generateEvidenceReport(scan) {
     const verdictColor = VERDICT_COLORS[verdict] || VERDICT_COLORS.UNCERTAIN;
 
     // Fallbacks
-    const summary = scan.summary || scan.forensic_summary || 'Analysis complete.';
+    let fallbackSummary = 'Forensic analysis produced inconclusive results for this image.';
+    if (verdict === 'AUTHENTIC') {
+      fallbackSummary = 'This image shows characteristics consistent with authentic photography.';
+    } else if (verdict === 'AI_GENERATED') {
+      fallbackSummary = 'This image shows evidence of AI generation across multiple forensic dimensions.';
+    }
+    
+    const summary = scan.summary || scan.forensic_summary || fallbackSummary;
     const suspectedModel = scan.suspected_model || 'Not determined';
     const inputType = (scan.input_type || 'unknown').toUpperCase();
     const mediaType = scan.media_type 
@@ -341,38 +348,47 @@ function generateEvidenceReport(scan) {
     // FOOTER on every page
     // ───────────────────────────────────────────────────────────────────────
 
-    const totalPages = doc.bufferedPageRange().count;
+    // === DO NOT CALL doc.end() YET ===
+    
+    // Add footers to all pages
+    const range = doc.bufferedPageRange();
+    const totalPages = range.count;
+    
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
       
-      // Draw footer line
-      doc.moveTo(60, doc.page.height - 50)
-         .lineTo(doc.page.width - 60, doc.page.height - 50)
+      const footerY = doc.page.height - 45;
+      
+      // Footer line
+      doc.moveTo(60, footerY - 8)
+         .lineTo(doc.page.width - 60, footerY - 8)
+         .lineWidth(0.5)
          .stroke('#cccccc');
       
       // Footer left: scan ID
       doc.font('Courier')
-         .fontSize(8)
-         .fillColor('#888888')
+         .fontSize(7)
+         .fillColor('#999999')
          .text(
            'VeritasAI Forensic Report — Scan ID: ' + (scan.id || 'N/A'),
            60,
-           doc.page.height - 38,
+           footerY,
            { lineBreak: false }
          );
       
       // Footer right: page number
       doc.font('Helvetica')
-         .fontSize(8)
-         .fillColor('#888888')
+         .fontSize(7)
+         .fillColor('#999999')
          .text(
            'Page ' + (i + 1) + ' of ' + totalPages,
-           0,
-           doc.page.height - 38,
-           { align: 'right', width: doc.page.width - 60, lineBreak: false }
+           60,
+           footerY,
+           { align: 'right', width: doc.page.width - 120, lineBreak: false }
          );
     }
-
+    
+    // === NOW call doc.end() — AFTER the footer loop ===
     doc.end();
   });
 }
