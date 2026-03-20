@@ -28,8 +28,79 @@ const API_KEY       = () => process.env.LONGCAT_API_KEY || '';
 
 // ─── Shared utilities ─────────────────────────────────────────────────────────
 
+function sanitizeDescriptions(text) {
+  // Find all technical_description values and sanitize them
+  // This handles the most common failure: unescaped quotes inside descriptions
+  
+  return text.replace(
+    /"technical_description"\s*:\s*"([\s\S]*?)(?=",\s*"|"\s*})/g,
+    (match, description) => {
+      // Remove any embedded double quotes that aren't escaped
+      const safe = description
+        .replace(/\r?\n/g, ' ')           // Remove newlines
+        .replace(/\t/g, ' ')              // Remove tabs
+        .replace(/\\"/g, '§QUOTE§')       // Protect already-escaped quotes
+        .replace(/"/g, "'")              // Replace unescaped " with '
+        .replace(/§QUOTE§/g, '\\"')      // Restore escaped quotes
+        .replace(/\s+/g, ' ')            // Collapse multiple spaces
+        .trim()
+      return '"technical_description": "' + safe
+    }
+  )
+}
+
+function sanitizeSignalsArray(text) {
+  // Find the signals array and clean each string value inside it
+  const signalsStart = text.indexOf('"signals"')
+  if (signalsStart === -1) return text
+  
+  const beforeSignals = text.substring(0, signalsStart)
+  let signalsSection = text.substring(signalsStart)
+  
+  // Find the end of the signals array
+  let depth = 0
+  let inString = false
+  let escape = false
+  let arrayStart = signalsSection.indexOf('[')
+  let arrayEnd = -1
+  
+  if (arrayStart === -1) return text
+  
+  for (let i = arrayStart; i < signalsSection.length; i++) {
+    const ch = signalsSection[i]
+    if (escape) { escape = false; continue }
+    if (ch === '\\') { escape = true; continue }
+    if (ch === '"' && !escape) { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '[' || ch === '{') depth++
+    if (ch === ']' || ch === '}') {
+      depth--
+      if (depth === 0) { arrayEnd = i; break }
+    }
+  }
+  
+  if (arrayEnd === -1) return text
+  
+  let signalsContent = signalsSection.substring(arrayStart, arrayEnd + 1)
+  const afterSignals = signalsSection.substring(arrayEnd + 1)
+  
+  // Clean up the signals content
+  signalsContent = signalsContent
+    .replace(/\r?\n\s*/g, ' ')          // Flatten to single line
+    .replace(/\t/g, ' ')               // Remove tabs
+    .replace(/\s+/g, ' ')              // Collapse spaces
+  
+  return beforeSignals + '"signals": ' + signalsContent + afterSignals
+}
+
 function repairJson(text) {
   let cleaned = text.trim();
+  
+  // NEW: Step 0a — sanitize descriptions before anything else
+  cleaned = sanitizeDescriptions(cleaned)
+  
+  // NEW: Step 0b — flatten the signals array
+  cleaned = sanitizeSignalsArray(cleaned)
   
   // Strip markdown fences
   cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
@@ -115,16 +186,55 @@ function extractPartialResult(text) {
   
   // Isolate each signal block based on the "name" field
   const signalBlocks = text.split(/"name"\s*:\s*/i).slice(1);
-  signalBlocks.forEach((block) => {
+
+  // Also try to extract descriptions (supporting both double and single quotes)
+  const descriptions = [...text.matchAll(
+    /(?:["']+)technical_description(?:["']+)\s*:\s*(?:["']+)([\s\S]{10,300}?)(?:["']+(?:\s*,|\s*}|\s*$))/g
+  )]
+  
+  // Also try XML-style tags the model sometimes uses  
+  const xmlDescriptions = [...text.matchAll(
+    /<technical_description>([\s\S]{10,300}?)<\/technical_description>/g
+  )]
+  
+  const allDescriptions = descriptions.length > 0 ? descriptions : xmlDescriptions
+
+  signalBlocks.forEach((block, i) => {
     const nameMatch = block.match(/^"([^"]+)"/);
     const sevMatch = block.match(/"severity"\s*:\s*"?(CRITICAL|WARNING|NOTE|CLEAR)"?|\[severity\]\s*(CRITICAL|WARNING|NOTE|CLEAR)|<severity>\s*(CRITICAL|WARNING|NOTE|CLEAR)/i);
-    const descMatch = block.match(/"technical_description"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"|\[technical_description\]\s*([^"}\n]+)|<technical_description>\s*([^<"}\n]+)/i);
+    
+    // Fallback: the model sometimes entirely forgets the "technical_description" key 
+    // and just outputs the raw string after severity.
+    let fallbackDesc = null;
+    if (sevMatch) {
+      const idx = block.indexOf(sevMatch[0]);
+      if (idx !== -1) {
+        let remainder = block.substring(idx + sevMatch[0].length);
+        // Sometimes it outputs `"technical_description": ` but we missed it with regex previously.
+        // Strip out any trailing garbage or JSON syntax left over at start and end
+        remainder = remainder.replace(/^(?:["',\s:]|technical_description)+/, '');
+        remainder = remainder.replace(/[",\s}]+$/, '');
+        if (remainder.length > 5) fallbackDesc = remainder.trim();
+      }
+    }
+    
+    let desc = allDescriptions[i]?.[1] || fallbackDesc || null
+    
+    // Clean the description if found
+    if (desc) {
+      desc = desc
+        .replace(/\r?\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/^['"]|['"]$/g, '')
+        .trim();
+    }
     
     if (nameMatch) {
       result.signals.push({
         name: nameMatch[1],
         severity: sevMatch ? (sevMatch[1] || sevMatch[2] || sevMatch[3]).toUpperCase() : 'NOTE',
-        technical_description: descMatch ? (descMatch[1] || descMatch[2] || descMatch[3]).trim() : 'Signal detected but detailed description could not be parsed.'
+        technical_description: desc || 
+          'Analysis detected this signal but the detailed description was not recoverable.'
       });
     }
   });

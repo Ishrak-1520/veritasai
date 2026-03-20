@@ -1,14 +1,14 @@
 {
   "verdict": "AUTHENTIC",
   "confidence": 89,
-  "summary": "The image shows consistent authentic characteristics with natural lighting, realistic textures, and plausible object interactions. No definitive AI artifacts were detected across multiple forensic dimensions.",
+  "summary": "The image shows consistent photographic characteristics with natural lighting, realistic textures, and plausible object interactions. No definitive AI artifacts were detected across multiple forensic dimensions.",
   "suspected_model": null,
   "generation_technique": null,
   "signals": [
     {
       "name": "Hand and Finger Anatomy",
       "severity": "CLEAR",
-      "technical_description": "Both hands show correct finger count, natural joint proportions, and plausible typing posture. No merged digits or anatomical anomalies detected."
+      "technical_description": "Both hands show correct finger count, natural joint proportions, and plausible typing posture. No merging or extra digits observed."
     },
     {
       "name": "Skin Texture",
@@ -23,22 +23,22 @@
     {
       "name": "Background Plausibility",
       "severity": "CLEAR",
-      "technical_description": "Outdoor setting with wooden table, smartphone, notebook, and coffee cup forms a coherent and realistic scene. Depth of field transitions are consistent with real camera optics."
+      "technical_description": "Outdoor setting with wooden table, smartphone, notebook, and coffee cup forms a coherent and realistic scene. Perspective relationships are physically plausible."
     },
     {
       "name": "Edge Artifacts",
       "severity": "CLEAR",
-      "technical_description": "Subject boundaries show natural blur consistent with shallow depth of field. No halo effects, composite seams, or unnatural edge sharpening detected."
+      "technical_description": "Subject boundaries show natural depth-of-field blur consistent with real camera optics. No halo effects or unnatural edge blending detected."
     },
     {
-      "name": "Object Interaction",
+      "name": "Object Coherence",
       "severity": "CLEAR",
-      "technical_description": "Hands are properly positioned on keyboard with natural finger placement. Watch strap fits correctly around wrist without clipping or distortion."
+      "technical_description": "All objects including laptop, phone, notebook, and cup are properly scaled relative to each other and show realistic material properties."
     },
     {
-      "name": "Material Rendering",
+      "name": "Hair Coherence",
       "severity": "CLEAR",
-      "technical_description": "Wood grain on table, fabric texture of clothing, and metallic sheen on watch face all show appropriate material properties and surface detail."
+      "technical_description": "Visible hair on neck and head shows natural strand definition and blending with background without artificial clumping or uniform texture."
     }
   ]
 }
