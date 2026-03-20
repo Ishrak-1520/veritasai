@@ -57,6 +57,16 @@ async function initializeDatabase() {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS benchmark_results (
+        image_id TEXT PRIMARY KEY,
+        ground_truth TEXT,
+        verdict TEXT,
+        confidence INTEGER,
+        ran_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     const migrations = [
       "ALTER TABLE scans ADD COLUMN input_type TEXT",
       "ALTER TABLE scans ADD COLUMN input_value TEXT", 

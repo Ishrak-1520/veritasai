@@ -106,10 +106,13 @@ app.use('/api/auth/register', authLimiter);
 // API routes
 // ---------------------------------------------------------------------------
 
+const benchmarkRoutes = require('./routes/benchmark');
+
 app.use('/api/analyze', analyzeRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/scans', scansRoutes);
+app.use('/api/benchmark', benchmarkRoutes);
 
 // ---------------------------------------------------------------------------
 // Budget endpoint (lightweight, no separate route file needed)

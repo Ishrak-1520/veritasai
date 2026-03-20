@@ -1,29 +1,44 @@
 {
-  "verdict": "AI_GENERATED",
+  "verdict": "AUTHENTIC",
   "confidence": 85,
-  "summary": "The image exhibits multiple forensic indicators consistent with AI generation, including unnatural skin texture uniformity and subtle inconsistencies in facial lighting. The presence of a watermark referencing StyleGAN2 strongly suggests synthetic origin.",
-  "suspected_model": "StyleGAN",
+  "summary": "The image shows a hiker standing on a mountain ridge with natural lighting and realistic terrain details. No clear AI-generated artifacts are present, and the scene appears consistent with real photography.",
+  "suspected_model": null,
   "generation_technique": null,
   "signals": [
     {
-      "name": "\"StyleGAN2\" watermark",
-      "severity": "CRITICAL",
-      "technical_description": "The image contains a visible watermark in the bottom right corner reading 'StyleGAN2 (Karras et al.)', which directly identifies it as output from a known generative adversarial network model. This is definitive evidence of AI generation."
+      "name": "Lighting Consistency",
+      "severity": "CLEAR",
+      "technical_description": "The lighting is consistent with a natural sunrise or sunset, casting soft shadows and warm tones across the landscape. The light source direction aligns logically with the terrain and subject."
     },
     {
-      "name": "Skin texture uniformity",
-      "severity": "WARNING",
-      "technical_description": "The skin exhibits unnaturally smooth and uniform texture with minimal pore structure or natural imperfections, particularly around the cheeks and forehead. This lack of micro-detail is characteristic of GAN-generated faces."
+      "name": "Background Plausibility",
+      "severity": "CLEAR",
+      "technical_description": "The mountainous background features realistic geological formations, depth, and atmospheric perspective. The distant lake and layered ridges are spatially coherent and physically plausible."
     },
     {
-      "name": "Lighting consistency",
-      "severity": "NOTE",
-      "technical_description": "\"The lighting on the face appears slightly inconsistent, with subtle mismatches in shadow direction between the nose and cheek areas. While not definitive alone, this contributes to an overall synthetic appearance when combined with other signals."
+      "name": "Edge Artifacts",
+      "severity": "CLEAR",
+      "technical_description": "Subject edges, particularly around the hiker and rocks, show natural blending with no halo effects or unnatural blurring. The transition between foreground and background is consistent with real camera optics."
     },
     {
-      "name": "Hair strand definition",
-      "severity": "NOTE",
-      "\"The hair strands show some unnatural clustering and lack fine individual detail, especially near the edges of the face. This is a common artifact in GAN-generated portraits where hair rendering remains challenging."
+      "name": "Semantic Coherence",
+      "severity": "CLEAR",
+      "technical_description": "The scene depicts a realistic hiking scenario with appropriate gear, terrain, and environmental context. All elements fit together logically as they would in nature."
+    },
+    {
+      "name": "Skin Texture",
+      "severity": "CLEAR",
+      "technical_description": "The visible skin on the hiker's arms and legs shows natural variation, tone differences, and texture consistent with real human skin under outdoor lighting conditions."
+    },
+    {
+      "name": "Hair Coherence",
+      "severity": "CLEAR",
+      "technical_description": "The hiker's hair appears naturally integrated with the head and shows realistic flow and volume, without clumping or unnatural blending into the background."
+    },
+    {
+      "name": "GAN/Diffusion Artifacts",
+      "severity": "CLEAR",
+      "technical_description": "No checkerboard patterns, periodic noise, or color banding typical of generative models are visible. The image exhibits natural sensor-like grain and tonal variation."
     }
   ]
 }

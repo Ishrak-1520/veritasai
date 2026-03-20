@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VeritasAI — Detection Benchmark</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- Google Fonts: Inter and Roboto Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar glass-panel">
+    <div class="nav-brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--cyan)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+      <path d="m9 12 2 2 4-4"/></svg>
+      VeritasAI
+    </div>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/scan.html">Analyze</a>
+      <a href="/benchmark.html" class="active">Benchmark</a>
+      <a href="/history.html">History</a>
+    </div>
+    <div class="nav-auth">
+      <button id="navLoginBtn" class="btn-secondary" style="display:none;" onclick="location.href='/login.html'">Sign In</button>
+      <button id="navRegisterBtn" class="btn-primary" style="display:none;" onclick="location.href='/register.html'">Create Account</button>
+      <div id="navUserMenu" style="display:none; align-items:center; gap:12px">
+        <span id="navUserEmail" style="font-size:13px; color:var(--text-dim)"></span>
+        <button id="navLogoutBtn" class="btn-secondary">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- HEADER SECTION -->
+    <div style="margin-bottom: 32px">
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--cyan); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 8px;">
+        Academic Performance Evaluation
+      </div>
+      <h1 style="font-family: var(--font-mono); font-size: 24px; font-weight: 700; margin-bottom: 12px; margin-top: 0;">
+        Detection Benchmark
+      </h1>
+      <p style="font-size: 13px; color: var(--text-dim); max-width: 600px; line-height: 1.7; margin: 0;">
+        VeritasAI was tested against 20 images — 10 known authentic photographs 
+        and 10 confirmed AI-generated images from public sources. Results are 
+        cached after the first run. Each image was analyzed using the full 
+        forensic pipeline including dual-prompt verification and confidence 
+        calibration.
+      </p>
+    </div>
+
+    <!-- RUN BUTTON AND STATUS -->
+    <div class="card" style="margin-bottom: 24px; padding: 20px">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px">
+        <div>
+          <div id="benchmarkStatus" style="font-family: var(--font-mono); font-size: 12px; color: var(--text-dim)">
+            Loading results...
+          </div>
+          <div id="benchmarkLastRun" style="font-size: 11px; color: var(--text-faint); margin-top: 4px"></div>
+        </div>
+        <button class="btn-primary" id="runBenchmarkBtn">
+          ▶ &nbsp;Run Benchmark
+        </button>
+      </div>
+      
+      <!-- PROGRESS BAR (hidden until running) -->
+      <div id="benchmarkProgress" style="display:none; margin-top:16px">
+        <div style="height:3px; background:var(--border); border-radius:2px">
+          <div id="benchmarkProgressFill" 
+               style="height:100%; background:var(--cyan); border-radius:2px; 
+                      width:0%; transition:width 0.5s ease"></div>
+        </div>
+        <div id="benchmarkProgressLabel" 
+             style="font-size:11px; font-family:var(--font-mono); 
+                    color:var(--text-faint); margin-top:6px">
+          Preparing...
+        </div>
+      </div>
+    </div>
+
+    <!-- METRICS CARDS (hidden until results exist) -->
+    <div id="metricsSection" style="display:none">
+      
+      <!-- 4 metric cards -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px">
+        <div class="card" style="padding:20px; text-align:center">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px">Accuracy</div>
+          <div id="metricAccuracy" style="font-family: var(--font-mono); font-size: 36px; font-weight: 700; color: var(--cyan); margin-bottom: 4px">--%</div>
+          <div style="font-size: 11px; color: var(--text-faint)">Overall correct predictions</div>
+        </div>
+        <div class="card" style="padding:20px; text-align:center">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px">Precision</div>
+          <div id="metricPrecision" style="font-family: var(--font-mono); font-size: 36px; font-weight: 700; color: var(--cyan); margin-bottom: 4px">--%</div>
+          <div style="font-size: 11px; color: var(--text-faint)">Correctly identified AI / Total AI flagged</div>
+        </div>
+        <div class="card" style="padding:20px; text-align:center">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px">Recall</div>
+          <div id="metricRecall" style="font-family: var(--font-mono); font-size: 36px; font-weight: 700; color: var(--cyan); margin-bottom: 4px">--%</div>
+          <div style="font-size: 11px; color: var(--text-faint)">Detected AI / Actual AI generated</div>
+        </div>
+        <div class="card" style="padding:20px; text-align:center">
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px">F1 Score</div>
+          <div id="metricF1" style="font-family: var(--font-mono); font-size: 36px; font-weight: 700; color: var(--cyan); margin-bottom: 4px">--%</div>
+          <div style="font-size: 11px; color: var(--text-faint)">Harmonic mean of precision &amp; recall</div>
+        </div>
+      </div>
+
+      <!-- CONFUSION MATRIX -->
+      <div class="card" style="margin-bottom:24px; padding:20px">
+        <div class="panel-header" style="margin:-20px -20px 16px">
+          <div class="dot"></div>
+          <span>Confusion Matrix</span>
+        </div>
+        
+        <table style="width:100%; text-align:center; border-collapse:collapse; margin-bottom: 16px;">
+          <thead>
+            <tr>
+              <th style="padding: 10px; border-bottom: 1px solid var(--border); color: var(--text-dim)"></th>
+              <th style="padding: 10px; border-bottom: 1px solid var(--border); color: var(--text-dim)">Predicted AI</th>
+              <th style="padding: 10px; border-bottom: 1px solid var(--border); color: var(--text-dim)">Predicted Authentic</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 16px; border-bottom: 1px solid var(--border); color: var(--text-dim); text-align:left">Actually AI</td>
+              <td style="padding: 16px; border-bottom: 1px solid var(--border)">
+                <div id="cmTP" style="font-family: var(--font-mono); font-size: 24px; color: var(--green); margin-bottom: 4px">0</div>
+                <div style="font-size: 11px; color: var(--text-faint)">True Positive</div>
+              </td>
+              <td style="padding: 16px; border-bottom: 1px solid var(--border)">
+                <div id="cmFN" style="font-family: var(--font-mono); font-size: 24px; color: var(--red); margin-bottom: 4px">0</div>
+                <div style="font-size: 11px; color: var(--text-faint)">False Negative</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 16px; color: var(--text-dim); text-align:left">Actually Authentic</td>
+              <td style="padding: 16px;">
+                <div id="cmFP" style="font-family: var(--font-mono); font-size: 24px; color: var(--red); margin-bottom: 4px">0</div>
+                <div style="font-size: 11px; color: var(--text-faint)">False Positive</div>
+              </td>
+              <td style="padding: 16px;">
+                <div id="cmTN" style="font-family: var(--font-mono); font-size: 24px; color: var(--green); margin-bottom: 4px">0</div>
+                <div style="font-size: 11px; color: var(--text-faint)">True Negative</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="font-size: 12px; color: var(--text-dim); display:flex; gap: 24px;">
+          <span>False Positive Rate: <strong id="fprValue">0%</strong></span>
+          <span>False Negative Rate: <strong id="fnrValue">0%</strong></span>
+        </div>
+      </div>
+
+      <!-- PER-IMAGE RESULTS TABLE -->
+      <div class="card">
+        <div class="panel-header" style="margin:-20px -20px 16px">
+          <div class="dot"></div>
+          <span>Per-Image Results</span>
+        </div>
+        <div style="padding:0">
+          <table class="history-table" id="resultsTable" style="width:100%">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Source</th>
+                <th>Ground Truth</th>
+                <th>Verdict</th>
+                <th>Confidence</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div> <!-- close metricsSection -->
+
+    <!-- METHODOLOGY NOTE -->
+    <div style="margin-top:24px; padding:16px; background:var(--surface); 
+                border:1px solid var(--border); border-radius:var(--radius)">
+      <div style="font-family: var(--font-mono); font-size: 10px; color: var(--cyan); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px">
+        Methodology
+      </div>
+      <p style="font-size:12px; color:var(--text-dim); line-height:1.7; margin:0;">
+        Each image was analyzed using VeritasAI's full detection pipeline: 
+        (1) primary forensic analysis using LongCat-Flash-Omni-2603 vision model 
+        with 11-dimension examination, (2) skeptic verification pass when AI_GENERATED 
+        verdict exceeds 70% confidence, (3) post-processing confidence calibration 
+        based on signal severity distribution. UNCERTAIN verdicts are counted as 
+        incorrect for both ground truth classes. All AI-generated images are sourced 
+        from Wikimedia Commons with explicit AI-generated labels. All authentic images 
+        are real photographs from public domain sources.
+      </p>
+    </div>
+
+  </div> <!-- close main content -->
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/benchmark.js"></script>
+</body>
+</html>
