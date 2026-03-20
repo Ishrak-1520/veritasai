@@ -18,7 +18,7 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 
 const { getDb } = require('./db');
-const { FORENSIC_PROMPT, SKEPTIC_PROMPT, EDUCATION_PROMPT } = require('./prompts');
+const { FORENSIC_PROMPT, FORENSIC_PROMPT_SIMPLE, SKEPTIC_PROMPT, EDUCATION_PROMPT } = require('./prompts');
 
 // ─── Endpoint helpers ────────────────────────────────────────────────────────
 
@@ -50,14 +50,72 @@ function repairJson(text) {
   // Fix trailing commas before } or ]
   cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
   
-  // Fix unquoted string values that should be quoted
+  // Step 5 — Fix unquoted string values that should be quoted
   // Only fix known string fields
   cleaned = cleaned.replace(
     /("verdict"\s*:\s*)([A-Z_]+)([,}\s])/g, 
     '$1"$2"$3'
   );
   
+  // Step 6 — Fix unescaped quotes inside string values
+  cleaned = cleaned.replace(
+    /"([^"]*(?:technical_description|summary|name)[^"]*)":\s*"((?:[^"\\]|\\.)*)"/g,
+    (match, key, value) => {
+      const fixedValue = value.replace(/(?<!\\)"/g, '\\"');
+      return `"${key}": "${fixedValue}"`;
+    }
+  );
+
+  // Step 7 — Fix line breaks inside string values
+  cleaned = cleaned.replace(/"([^"]*)":\s*"([^"]*)(\n)([^"]*)"/g, 
+    (m, k, v1, nl, v2) => `"${k}": "${v1} ${v2}"`);
+
+  // Step 8 — Fix missing comma between array elements
+  cleaned = cleaned.replace(/\}\s*\{/g, '},{');
+
+  // Step 9 — Fix missing comma between top-level fields
+  cleaned = cleaned.replace(/"\s*\n\s*"/g, '",\n"');
+  cleaned = cleaned.replace(/([0-9])\s*\n\s*"/g, '$1,\n"');
+  cleaned = cleaned.replace(/}\s*\n\s*"/g, '},\n"');
+
   return cleaned;
+}
+
+function extractPartialResult(text) {
+  const result = {
+    verdict: 'UNCERTAIN',
+    confidence: 40,
+    summary: 'Analysis completed but result formatting was imperfect.',
+    suspected_model: null,
+    generation_technique: null,
+    signals: []
+  };
+  
+  // Try to extract verdict
+  const verdictMatch = text.match(/"verdict"\s*:\s*"?(AI_GENERATED|AUTHENTIC|UNCERTAIN)"?/);
+  if (verdictMatch) result.verdict = verdictMatch[1];
+  
+  // Try to extract confidence
+  const confMatch = text.match(/"confidence"\s*:\s*(\d+)/);
+  if (confMatch) result.confidence = parseInt(confMatch[1]);
+  
+  // Try to extract summary
+  const summaryMatch = text.match(/"summary"\s*:\s*"([^"]{10,200})"/);
+  if (summaryMatch) result.summary = summaryMatch[1];
+  
+  // Try to extract signal names at minimum
+  const signalNames = [...text.matchAll(/"name"\s*:\s*"([^"]+)"/g)];
+  const severities = [...text.matchAll(/"severity"\s*:\s*"?(CRITICAL|WARNING|NOTE|CLEAR)"?/g)];
+  
+  signalNames.forEach((match, i) => {
+    result.signals.push({
+      name: match[1],
+      severity: severities[i]?.[1] || 'NOTE',
+      technical_description: 'Signal detected but detailed description could not be parsed.'
+    });
+  });
+  
+  return result;
 }
 
 function sleep(ms) {
@@ -186,14 +244,28 @@ async function callLongcatOpenAI(body, label) {
       
       try {
         return JSON.parse(cleaned);
-      } catch (e) {
-        console.error(`[Longcat] JSON repair failed for ${label}:`, e.message);
-        // If we still can't parse, return a fallback safety object so the app doesn't crash
+      } catch (parseError) {
+        console.error('[Longcat] JSON repair failed for', label + ':', parseError.message);
+        // Try partial extraction before giving up
+        const partial = extractPartialResult(cleaned);
+        if (partial.signals.length > 0 || partial.verdict !== 'UNCERTAIN') {
+          console.log('[Longcat] Partial extraction succeeded:', 
+            partial.verdict, partial.confidence + '%', 
+            partial.signals.length + ' signals');
+          return partial;
+        }
+        // If truly nothing could be extracted, return the fallback
         return {
-          verdict: "UNCERTAIN",
-          confidence: 0,
-          summary: "Analysis failed due to malformed AI response.",
-          signals: []
+          verdict: 'UNCERTAIN',
+          confidence: 40,
+          summary: 'Analysis completed but the result could not be fully parsed.',
+          suspected_model: null,
+          generation_technique: null,
+          signals: [{
+            name: 'Parse Error',
+            severity: 'NOTE',
+            technical_description: 'The AI model completed analysis but returned data in an unexpected format. The result shown is a fallback. Try re-analyzing the image.'
+          }]
         };
       }
     } catch (err) {
@@ -255,6 +327,52 @@ async function analyzeImage(base64Data, mimeType) {
 }
 
 /**
+ * Analyze an image with a simpler prompt to avoid JSON parsing issues.
+ * Uses LongCat-Flash-Omni-2603 via the OpenAI-format endpoint.
+ *
+ * @param {string} base64Data – base64-encoded image (no data URI prefix)
+ * @param {string} mimeType   – e.g. "image/jpeg"
+ * @returns {Promise<object>}  – forensic JSON report
+ */
+async function analyzeImageSimple(base64Data, mimeType) {
+  const body = {
+    model: 'LongCat-Flash-Omni-2603',
+    stream: false,
+    max_tokens: 2000,
+    output_modalities: ["text"],
+    messages: [
+      {
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text: FORENSIC_PROMPT_SIMPLE
+          }
+        ]
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'input_image',
+            input_image: {
+              type: 'base64',
+              data: [base64Data]
+            }
+          },
+          {
+            type: 'text',
+            text: 'Analyze this image and return the forensic JSON report.'
+          }
+        ]
+      }
+    ]
+  };
+
+  return callLongcatOpenAI(body, 'analyzeImageSimple');
+}
+
+/**
  * Analyze an image using the skeptic prompt (defense perspective).
  * Uses LongCat-Flash-Omni-2603 via the OpenAI-format endpoint.
  *
@@ -311,6 +429,26 @@ async function analyzeImageSkeptic(base64Data, mimeType) {
 async function analyzeImageWithVerification(base64Data, mimeType) {
   // Step 1 — Run primary analysis
   const primary = await analyzeImage(base64Data, mimeType);
+
+  // Detect parse failure fallback (40% UNCERTAIN with 0 or 1 signals)
+  const isParseFallback = (
+    primary.verdict === 'UNCERTAIN' && 
+    primary.confidence === 40 && 
+    primary.signals.length <= 1
+  );
+
+  if (isParseFallback) {
+    console.log('[Longcat] Parse failure detected, retrying with simplified prompt...');
+    try {
+      const simplified = await analyzeImageSimple(base64Data, mimeType);
+      if (simplified.signals.length >= 3) {
+        console.log('[Longcat] Simplified retry succeeded:', simplified.verdict);
+        return simplified;
+      }
+    } catch (err) {
+      console.log('[Longcat] Simplified retry also failed:', err.message);
+    }
+  }
 
   // Step 4 — If primary is not AI_GENERATED, return as-is (saves tokens)
   if (primary.verdict !== 'AI_GENERATED') {
