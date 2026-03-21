@@ -68,7 +68,7 @@ function addSection(doc, title) {
 // ─── Footer helper — draws footer on the CURRENT page ────────────────────────
 
 function drawPageFooter(doc, scanId, pageNum) {
-  const footerY = doc.page.height - 45;
+  const footerY = doc.page.height - 88;
   const leftEdge = 60;
   const rightEdge = doc.page.width - 60;
 
@@ -80,6 +80,10 @@ function drawPageFooter(doc, scanId, pageNum) {
      .lineWidth(0.5)
      .strokeColor('#cccccc')
      .stroke();
+
+  // Temporarily disable bottom margin for text calls to prevent auto-page breaks in margins
+  const oldBottom = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
 
   // Left: scan ID
   doc.font('Courier')
@@ -107,6 +111,7 @@ function drawPageFooter(doc, scanId, pageNum) {
        }
      );
 
+  doc.page.margins.bottom = oldBottom;
   doc.restore();
 }
 
@@ -118,7 +123,7 @@ async function generateEvidenceReport(scan) {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margin: 60
+      margins: { top: 60, right: 60, bottom: 100, left: 60 }
     });
 
     const chunks = [];
@@ -337,7 +342,7 @@ async function generateEvidenceReport(scan) {
       const blockHeight = 24 + descHeight + 10;
 
       // Check if we need a new page — draw footer on current page first
-      if (doc.y + blockHeight > doc.page.height - doc.page.margins.bottom - 40) {
+      if (doc.y + blockHeight > doc.page.height - doc.page.margins.bottom - 20) {
         drawPageFooter(doc, scan.id, currentPage);
         currentPage++;
         doc.addPage();
@@ -389,7 +394,7 @@ async function generateEvidenceReport(scan) {
     const exp = scan.explanation || {};
 
     if (exp.how_detected || exp.what_to_look_for || exp.technology_note) {
-      if (doc.y > doc.page.height - 180) {
+      if (doc.y > doc.page.height - doc.page.margins.bottom - 80) {
         drawPageFooter(doc, scan.id, currentPage);
         currentPage++;
         doc.addPage();
@@ -408,7 +413,7 @@ async function generateEvidenceReport(scan) {
       }
 
       if (exp.what_to_look_for) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 40) {
           drawPageFooter(doc, scan.id, currentPage);
           currentPage++;
           doc.addPage();
@@ -423,7 +428,7 @@ async function generateEvidenceReport(scan) {
       }
 
       if (exp.technology_note) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 40) {
           drawPageFooter(doc, scan.id, currentPage);
           currentPage++;
           doc.addPage();
