@@ -437,13 +437,13 @@ router.post('/', optionalAuth, async (req, res) => {
           .slice(0, 8);
       }
 
-      if (forensicsResult.verdict === 'LIKELY_AI' && forensicResult.verdict === 'AUTHENTIC') {
+      // Only downgrade if both independent layers agree on likely AI.
+      const forensicsCritical = (forensicsResult?.signals || [])
+        .some((s) => s.severity === 'CRITICAL');
+      const metaAlsoSaysAI = metadataResult?.metaVerdict === 'LIKELY_AI';
+      if (forensicsCritical && metaAlsoSaysAI && forensicResult.verdict === 'AUTHENTIC') {
         forensicResult.verdict = 'UNCERTAIN';
         forensicResult.confidence = Math.min(forensicResult.confidence, 65);
-      }
-
-      if (forensicsResult.verdict === 'LIKELY_AI' && forensicResult.verdict === 'AI_GENERATED') {
-        forensicResult.confidence = Math.min(92, forensicResult.confidence + 5);
       }
     }
 

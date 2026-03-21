@@ -178,12 +178,16 @@ def analyze_dct(img_cv: np.ndarray) -> Tuple[List[Dict], Dict]:
         "total_ac_energy": float(total_ac_energy),
     })
 
-    critical = high_to_low_ratio < 0.08 and block_variance < 0.00005
-    warning = (
-        high_to_low_ratio < 0.14 or
-        block_variance < 0.00012 or
-        (mid_ratio > 0.46 and high_ratio < 0.035)
-    )
+    dct_outliers = 0
+    if high_to_low_ratio < 0.05:
+        dct_outliers += 1
+    if block_variance < 0.00005:
+        dct_outliers += 1
+    if mid_ratio > 0.50 and high_ratio < 0.03:
+        dct_outliers += 1
+
+    critical = dct_outliers >= 2
+    warning = dct_outliers == 1
 
     if critical:
         signals.append(
@@ -308,7 +312,7 @@ def analyze_color_distribution(img_cv: np.ndarray) -> Tuple[List[Dict], Dict]:
     sat_std = float(np.std(sat_vals))
     metrics.update({"hue_std": hue_std, "sat_std": sat_std})
 
-    if hue_std < 5 and sat_std < 12:
+    if hue_std < 3 and sat_std < 12:
         signals.append(
             signal(
                 "Skin Tone Distribution",
@@ -357,7 +361,7 @@ def analyze_noise_pattern(img: Image.Image) -> Tuple[List[Dict], Dict]:
     signals = []
     warning_flags = 0
 
-    if residual_std < 3.5:
+    if residual_std < 1.5:
         warning_flags += 1
         signals.append(
             signal(
