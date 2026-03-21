@@ -14,6 +14,7 @@ const path = require('path');
 const { optionalAuth } = require('../lib/auth');
 const { analyzeImage, analyzeImageWithVerification, generateExplanation, checkTokenBudget } = require('../lib/longcat');
 const { extractFrames } = require('../lib/frameExtract');
+const { analyzeMetadata } = require('../lib/metadataAnalysis');
 
 const router = express.Router();
 
@@ -219,6 +220,7 @@ router.post('/', optionalAuth, async (req, res) => {
     sendEvent(res, { ...STEPS.FETCH, done: false });
     let base64, mimeType, mediaType, inputValue;
     let tempFilePath = null;
+    let imageBuffer = null;
 
     if (type === 'url') {
       const fetchMod = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
@@ -252,6 +254,7 @@ router.post('/', optionalAuth, async (req, res) => {
       mimeType = contentType.split(';')[0].trim();
       mediaType = contentType.includes('video') ? 'video' : 'image';
       inputValue = url;
+      if (mediaType === 'image') imageBuffer = buffer;
 
       // If video from URL, save to temp file for frame extraction
       if (mediaType === 'video') {
@@ -285,6 +288,7 @@ router.post('/', optionalAuth, async (req, res) => {
       mediaType = mimeType.startsWith('video/') ? 'video' : 'image';
       base64 = buffer.toString('base64');
       inputValue = tempFileId;
+      if (mediaType === 'image') imageBuffer = buffer;
     }
 
     // ── STEP 5: Frame extraction (video only) ───────────────────────────
@@ -303,8 +307,16 @@ router.post('/', optionalAuth, async (req, res) => {
 
     // ── STEP 6: Detection ───────────────────────────────────────────────
     let forensicResult;
+    let metadataResult = null;
 
     if (mediaType === 'image') {
+      try {
+        metadataResult = await analyzeMetadata(imageBuffer);
+      } catch (err) {
+        metadataResult = null;
+        console.warn('[Analyze] Metadata analysis failed (non-fatal):', err.message);
+      }
+
       sendEvent(res, { ...STEPS.FORENSIC, label: 'Analyzing image with AI vision model...', done: false });
       forensicResult = await analyzeImageWithVerification(base64, mimeType);
 
@@ -369,6 +381,38 @@ router.post('/', optionalAuth, async (req, res) => {
     // ── STEP 6.5: Calibrate result ──────────────────────────────────────
     forensicResult = calibrateResult(forensicResult);
 
+    // ── STEP 6.6: Metadata fusion (image only) ──────────────────────────
+    if (metadataResult) {
+      const metadataSignals = (metadataResult.signals || [])
+        .filter((sig) => sig.severity === 'CRITICAL' || sig.severity === 'WARNING');
+
+      if (metadataSignals.length) {
+        const signalMap = new Map();
+        for (const sig of forensicResult.signals || []) {
+          signalMap.set(sig.name, sig);
+        }
+        for (const sig of metadataSignals) {
+          const existing = signalMap.get(sig.name);
+          if (!existing || (SEVERITY_RANK[sig.severity] || 0) > (SEVERITY_RANK[existing.severity] || 0)) {
+            signalMap.set(sig.name, sig);
+          }
+        }
+        forensicResult.signals = [...signalMap.values()]
+          .sort((a, b) => (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0))
+          .slice(0, 8);
+      }
+
+      const hasMetaCritical = (metadataResult.signals || []).some((sig) => sig.severity === 'CRITICAL');
+      if (hasMetaCritical && forensicResult.verdict === 'AUTHENTIC') {
+        forensicResult.verdict = 'UNCERTAIN';
+        forensicResult.confidence = Math.min(forensicResult.confidence, 65);
+      }
+
+      if (metadataResult.metaVerdict === 'LIKELY_AI' && forensicResult.verdict === 'AI_GENERATED') {
+        forensicResult.confidence = Math.min(95, forensicResult.confidence + 8);
+      }
+    }
+
     // ── STEP 7: Education layer ─────────────────────────────────────────
     sendEvent(res, { ...STEPS.EDUCATION, done: false });
     const explanation = await generateExplanation(forensicResult);
@@ -394,8 +438,8 @@ router.post('/', optionalAuth, async (req, res) => {
     await db.execute({
       sql: `INSERT INTO scans
        (id, user_id, input_type, input_value, media_type, verdict, confidence,
-        signals_json, explanation, suspected_model)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        signals_json, explanation, suspected_model, meta_verdict)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         scanId,
         userId,
@@ -406,7 +450,8 @@ router.post('/', optionalAuth, async (req, res) => {
         forensicResult.confidence,
         JSON.stringify(forensicResult.signals),
         JSON.stringify(explanation),
-        forensicResult.suspected_model || null
+        forensicResult.suspected_model || null,
+        metadataResult?.metaVerdict || null
       ]
     });
 
@@ -421,6 +466,7 @@ router.post('/', optionalAuth, async (req, res) => {
         summary: forensicResult.summary,
         suspected_model: forensicResult.suspected_model,
         signals: forensicResult.signals,
+        metaVerdict: metadataResult?.metaVerdict || null,
         explanation
       }
     });
