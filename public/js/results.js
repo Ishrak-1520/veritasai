@@ -93,6 +93,9 @@ function renderScan(scan) {
     });
   }
 
+  /* ── Detection layers ─────────────────────────────── */
+  renderDetectionLayers(scan);
+
   /* ── Education sections ──────────────────────────── */
   var exp = scan.explanation || {};
   document.getElementById('howDetected').textContent = exp.how_detected || '';
@@ -163,6 +166,76 @@ function renderScan(scan) {
       btn.disabled = false;
     }, 3000);
   });
+}
+
+function renderDetectionLayers(scan) {
+  var existing = document.getElementById('detectionLayersCard');
+  if (existing) existing.remove();
+
+  var verdictText = visualVerdictText(scan.verdict);
+  var metaVerdict = scan.metaVerdict || scan.meta_verdict || null;
+  var freqVerdict = scan.freqVerdict || scan.freq_verdict || null;
+
+  var card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'detectionLayersCard';
+  card.style.marginBottom = '20px';
+  card.innerHTML =
+    '<div class="panel-header">' +
+      '<div class="dot"></div>' +
+      '<span>Detection Layers</span>' +
+    '</div>' +
+    '<div style="padding:20px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px" id="detectionLayersGrid"></div>';
+
+  var results = document.getElementById('resultsContainer');
+  var cards = results.querySelectorAll(':scope > .card');
+  if (cards.length >= 3) {
+    results.insertBefore(card, cards[2]);
+  } else {
+    results.appendChild(card);
+  }
+
+  var grid = document.getElementById('detectionLayersGrid');
+  grid.appendChild(buildLayerCard('Visual AI Analysis', verdictText, true));
+  grid.appendChild(buildLayerCard('Metadata Forensics', layerVerdictText(metaVerdict), !!metaVerdict));
+  grid.appendChild(buildLayerCard('Frequency Analysis', layerVerdictText(freqVerdict), !!freqVerdict));
+}
+
+function buildLayerCard(title, verdict, isActive) {
+  var color = layerVerdictColor(verdict);
+  var wrap = document.createElement('div');
+  wrap.className = 'signal-card';
+  wrap.style.minHeight = '96px';
+  wrap.innerHTML =
+    '<div class="signal-name">' + escapeHtml(title) + '</div>' +
+    '<div style="font-family:var(--font-mono); font-size:16px; font-weight:700; color:' + color + '; letter-spacing:0.5px">' +
+      escapeHtml(verdict) +
+    '</div>' +
+    '<div style="font-size:11px; color:var(--text-dim); margin-top:6px">' +
+      (isActive ? 'Active' : 'Inactive') +
+    '</div>';
+  return wrap;
+}
+
+function visualVerdictText(v) {
+  if (v === 'AI_GENERATED') return 'AI DETECTED';
+  if (v === 'AUTHENTIC') return 'AUTHENTIC';
+  return 'UNCERTAIN';
+}
+
+function layerVerdictText(v) {
+  if (!v) return 'N/A';
+  if (v === 'LIKELY_AI') return 'LIKELY AI';
+  if (v === 'LIKELY_AUTHENTIC') return 'LIKELY AUTHENTIC';
+  if (v === 'INCONCLUSIVE') return 'INCONCLUSIVE';
+  return String(v).replace(/_/g, ' ');
+}
+
+function layerVerdictColor(v) {
+  if (v === 'AI DETECTED' || v === 'LIKELY AI') return 'var(--red)';
+  if (v === 'AUTHENTIC' || v === 'LIKELY AUTHENTIC') return 'var(--green)';
+  if (v === 'UNCERTAIN' || v === 'INCONCLUSIVE') return 'var(--amber)';
+  return 'var(--text-dim)';
 }
 
 /* ── Collapsible toggle ────────────────────────────── */

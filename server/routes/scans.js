@@ -24,6 +24,8 @@ function hydrateScan(row) {
     ...row,
     signals: safeParse(row.signals_json, []),
     explanation: safeParse(row.explanation, null),
+    metaVerdict: row.meta_verdict || null,
+    freqVerdict: row.freq_verdict || null,
   };
 }
 
