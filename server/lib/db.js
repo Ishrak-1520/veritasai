@@ -77,7 +77,8 @@ async function initializeDatabase() {
       "ALTER TABLE scans ADD COLUMN explanation TEXT",
       "ALTER TABLE scans ADD COLUMN suspected_model TEXT",
       "ALTER TABLE scans ADD COLUMN user_id INTEGER",
-      "ALTER TABLE scans ADD COLUMN meta_verdict TEXT"
+      "ALTER TABLE scans ADD COLUMN meta_verdict TEXT",
+      "ALTER TABLE scans ADD COLUMN freq_verdict TEXT"
     ];
 
     for (const sql of migrations) {

@@ -15,6 +15,7 @@ const { optionalAuth } = require('../lib/auth');
 const { analyzeImage, analyzeImageWithVerification, generateExplanation, checkTokenBudget } = require('../lib/longcat');
 const { extractFrames } = require('../lib/frameExtract');
 const { analyzeMetadata } = require('../lib/metadataAnalysis');
+const { runForensicsAnalysis } = require('../lib/forensicsClient');
 
 const router = express.Router();
 
@@ -308,14 +309,16 @@ router.post('/', optionalAuth, async (req, res) => {
     // ── STEP 6: Detection ───────────────────────────────────────────────
     let forensicResult;
     let metadataResult = null;
+    let forensicsResult = null;
 
     if (mediaType === 'image') {
-      try {
-        metadataResult = await analyzeMetadata(imageBuffer);
-      } catch (err) {
-        metadataResult = null;
-        console.warn('[Analyze] Metadata analysis failed (non-fatal):', err.message);
-      }
+      [metadataResult, forensicsResult] = await Promise.all([
+        analyzeMetadata(imageBuffer).catch(() => null),
+        runForensicsAnalysis(base64, mimeType).catch(() => null)
+      ]);
+
+      console.log('[Pipeline] Meta verdict:', metadataResult?.metaVerdict);
+      console.log('[Pipeline] Forensics verdict:', forensicsResult?.verdict);
 
       sendEvent(res, { ...STEPS.FORENSIC, label: 'Analyzing image with AI vision model...', done: false });
       forensicResult = await analyzeImageWithVerification(base64, mimeType);
@@ -413,6 +416,37 @@ router.post('/', optionalAuth, async (req, res) => {
       }
     }
 
+    // ── STEP 6.7: Frequency/forensics fusion (image only) ───────────────
+    if (forensicsResult) {
+      const frequencySignals = (forensicsResult.signals || [])
+        .filter((sig) => sig.severity === 'CRITICAL' || sig.severity === 'WARNING');
+
+      if (frequencySignals.length) {
+        const signalMap = new Map();
+        for (const sig of forensicResult.signals || []) {
+          signalMap.set(sig.name, sig);
+        }
+        for (const sig of frequencySignals) {
+          const existing = signalMap.get(sig.name);
+          if (!existing || (SEVERITY_RANK[sig.severity] || 0) > (SEVERITY_RANK[existing.severity] || 0)) {
+            signalMap.set(sig.name, sig);
+          }
+        }
+        forensicResult.signals = [...signalMap.values()]
+          .sort((a, b) => (SEVERITY_RANK[b.severity] || 0) - (SEVERITY_RANK[a.severity] || 0))
+          .slice(0, 8);
+      }
+
+      if (forensicsResult.verdict === 'LIKELY_AI' && forensicResult.verdict === 'AUTHENTIC') {
+        forensicResult.verdict = 'UNCERTAIN';
+        forensicResult.confidence = Math.min(forensicResult.confidence, 65);
+      }
+
+      if (forensicsResult.verdict === 'LIKELY_AI' && forensicResult.verdict === 'AI_GENERATED') {
+        forensicResult.confidence = Math.min(92, forensicResult.confidence + 5);
+      }
+    }
+
     // ── STEP 7: Education layer ─────────────────────────────────────────
     sendEvent(res, { ...STEPS.EDUCATION, done: false });
     const explanation = await generateExplanation(forensicResult);
@@ -438,8 +472,8 @@ router.post('/', optionalAuth, async (req, res) => {
     await db.execute({
       sql: `INSERT INTO scans
        (id, user_id, input_type, input_value, media_type, verdict, confidence,
-        signals_json, explanation, suspected_model, meta_verdict)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        signals_json, explanation, suspected_model, meta_verdict, freq_verdict)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         scanId,
         userId,
@@ -451,7 +485,8 @@ router.post('/', optionalAuth, async (req, res) => {
         JSON.stringify(forensicResult.signals),
         JSON.stringify(explanation),
         forensicResult.suspected_model || null,
-        metadataResult?.metaVerdict || null
+        metadataResult?.metaVerdict || null,
+        forensicsResult?.verdict || null
       ]
     });
 
@@ -467,6 +502,7 @@ router.post('/', optionalAuth, async (req, res) => {
         suspected_model: forensicResult.suspected_model,
         signals: forensicResult.signals,
         metaVerdict: metadataResult?.metaVerdict || null,
+        freqVerdict: forensicsResult?.verdict || null,
         explanation
       }
     });
