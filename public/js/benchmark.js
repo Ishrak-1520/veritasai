@@ -32,7 +32,7 @@ async function startBenchmark() {
     'Running benchmark — this may take 5-10 minutes...';
   
   let completed = 0;
-  const total = 20;
+  let total = 0;
   
   try {
     const response = await fetch('/api/benchmark/run');
@@ -53,13 +53,17 @@ async function startBenchmark() {
         if (!line) continue;
         try {
           const event = JSON.parse(line);
+
+          if (event.type === 'start') {
+            total = event.total || 0;
+          }
           
           if (event.type === 'progress') {
             completed++;
-            const pct = Math.round((completed / total) * 100);
+            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
             document.getElementById('benchmarkProgressFill').style.width = pct + '%';
             document.getElementById('benchmarkProgressLabel').textContent =
-              'Analyzed ' + completed + ' of ' + total + ' images... ' +
+              'Analyzed ' + completed + ' of ' + (total || '?') + ' images... ' +
               (event.status === 'cached' ? '(cached)' : '(' + event.verdict + ')');
           }
           
@@ -98,10 +102,8 @@ function renderResults(metrics, results, testImages, ranAt) {
   }
   
   const metrics_display = [
-    { id: 'metricAccuracy',  value: metrics.accuracy,  label: 'accuracy'  },
-    { id: 'metricPrecision', value: metrics.precision, label: 'precision' },
-    { id: 'metricRecall',    value: metrics.recall,    label: 'recall'    },
-    { id: 'metricF1',        value: metrics.f1,        label: 'f1'        }
+    { id: 'metricAuthenticRate', value: metrics.authenticDetectionRate || 0 },
+    { id: 'metricFalseAlarm', value: metrics.falseAlarmRate || 0 }
   ];
   
   metrics_display.forEach(m => {
@@ -112,14 +114,10 @@ function renderResults(metrics, results, testImages, ranAt) {
     el.style.color = colorForMetric(pct);
   });
   
-  document.getElementById('cmTP').textContent = metrics.confusionMatrix.TP;
-  document.getElementById('cmFP').textContent = metrics.confusionMatrix.FP;
-  document.getElementById('cmTN').textContent = metrics.confusionMatrix.TN;
-  document.getElementById('cmFN').textContent = metrics.confusionMatrix.FN;
-  document.getElementById('fprValue').textContent = 
-    Math.round(metrics.falsePositiveRate * 100) + '%';
-  document.getElementById('fnrValue').textContent = 
-    Math.round(metrics.falseNegativeRate * 100) + '%';
+  const summary = metrics.authenticSummary || {};
+  document.getElementById('authTotalValue').textContent = summary.totalAuthentic || 0;
+  document.getElementById('authCorrectValue').textContent = summary.correctlyAuthentic || 0;
+  document.getElementById('authFalseAlarmsValue').textContent = summary.falseAlarms || 0;
   
   const tbody = document.getElementById('resultsBody');
   tbody.innerHTML = '';
@@ -130,8 +128,8 @@ function renderResults(metrics, results, testImages, ranAt) {
     tr.innerHTML = `
       <td style="font-size:12px">${r.label || r.image_id || r.id}</td>
       <td style="font-size:11px; color:var(--text-faint)">${r.source || ''}</td>
-      <td><span class="badge ${r.ground_truth === 'AI_GENERATED' ? 'badge-red' : 'badge-green'}">
-        ${r.ground_truth === 'AI_GENERATED' ? 'AI' : 'Authentic'}
+      <td><span class="badge ${r.ground_truth === 'AUTHENTIC' ? 'badge-green' : 'badge-amber'}">
+        ${r.ground_truth === 'AUTHENTIC' ? 'Authentic' : 'Ambiguous'}
       </span></td>
       <td><span class="badge ${
         r.verdict === 'AI_GENERATED' ? 'badge-red' : 

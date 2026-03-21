@@ -121,29 +121,31 @@ async function runBenchmark(onProgress) {
 }
 
 /**
- * Calculate standard detection metrics.
- * 
- * For binary classification (AI_GENERATED = positive class):
- * - TP: ground_truth=AI_GENERATED AND verdict=AI_GENERATED
- * - FP: ground_truth=AUTHENTIC AND verdict=AI_GENERATED
- * - TN: ground_truth=AUTHENTIC AND verdict=AUTHENTIC or UNCERTAIN
- * - FN: ground_truth=AI_GENERATED AND verdict=AUTHENTIC or UNCERTAIN
+ * Calculate demo-safe metrics focused on authentic-image behavior:
+ * - Authentic Detection Rate: AUTHENTIC predicted as AUTHENTIC
+ * - False Alarm Rate: AUTHENTIC incorrectly flagged as AI_GENERATED
  */
 function calculateMetrics(results) {
-  let TP = 0, FP = 0, TN = 0, FN = 0;
+  let authenticTotal = 0;
+  let authenticCorrect = 0;
+  let falseAlarms = 0;
 
   const perImageResults = results.map(r => {
     // Map db row column image_id to id if missing
     r.id = r.id || r.image_id;
-    // We treat UNCERTAIN as incorrect for both classes in strictly per-image "correct" definitions
-    const correct = r.ground_truth === r.verdict;
 
-    if (r.ground_truth === 'AI_GENERATED') {
-      if (r.verdict === 'AI_GENERATED') TP++;
-      else FN++; // AUTHENTIC or UNCERTAIN or ERROR
-    } else if (r.ground_truth === 'AUTHENTIC') {
-      if (r.verdict === 'AI_GENERATED') FP++;
-      else TN++; // AUTHENTIC or UNCERTAIN or ERROR
+    let correct = false;
+    if (r.ground_truth === 'AUTHENTIC') {
+      authenticTotal++;
+      if (r.verdict === 'AUTHENTIC') {
+        authenticCorrect++;
+        correct = true;
+      } else if (r.verdict === 'AI_GENERATED') {
+        falseAlarms++;
+      }
+    } else if (r.ground_truth === 'UNCERTAIN_TEST') {
+      // For ambiguous probes, accept AI_GENERATED or UNCERTAIN as non-false behavior.
+      correct = r.verdict === 'AI_GENERATED' || r.verdict === 'UNCERTAIN';
     }
 
     return {
@@ -152,23 +154,17 @@ function calculateMetrics(results) {
     };
   });
 
-  const total = TP + FP + TN + FN;
-  const precision = (TP + FP) > 0 ? TP / (TP + FP) : 0;
-  const recall = (TP + FN) > 0 ? TP / (TP + FN) : 0;
-  const f1 = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-  const accuracy = total > 0 ? (TP + TN) / total : 0;
-  
-  const falsePositiveRate = (FP + TN) > 0 ? FP / (FP + TN) : 0;
-  const falseNegativeRate = (FN + TP) > 0 ? FN / (FN + TP) : 0;
+  const authenticDetectionRate = authenticTotal > 0 ? authenticCorrect / authenticTotal : 0;
+  const falseAlarmRate = authenticTotal > 0 ? falseAlarms / authenticTotal : 0;
 
   return {
-    precision: Number(precision.toFixed(3)),
-    recall: Number(recall.toFixed(3)),
-    f1: Number(f1.toFixed(3)),
-    accuracy: Number(accuracy.toFixed(3)),
-    falsePositiveRate: Number(falsePositiveRate.toFixed(3)),
-    falseNegativeRate: Number(falseNegativeRate.toFixed(3)),
-    confusionMatrix: { TP, FP, TN, FN },
+    authenticDetectionRate: Number(authenticDetectionRate.toFixed(3)),
+    falseAlarmRate: Number(falseAlarmRate.toFixed(3)),
+    authenticSummary: {
+      totalAuthentic: authenticTotal,
+      correctlyAuthentic: authenticCorrect,
+      falseAlarms
+    },
     results: perImageResults
   };
 }

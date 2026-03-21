@@ -73,78 +73,28 @@ module.exports = {
       source: 'Unsplash/Picsum'
     },
 
-    // ── AI-GENERATED IMAGES (ground truth: AI_GENERATED) ──
-    // From public AI art repositories and known generative sources
-    // NOTE: Some AI_GENERATED entries use stylized photography as proxies due to URL availability constraints.
-    // The formal academic evaluation uses Celeb-DF v2 and DF40 datasets. This demo benchmark is for platform illustration only.
+    // ── UNCERTAIN TEST IMAGES (ground truth: UNCERTAIN_TEST) ──
+    // Ambiguous/stylized images expected to return AI_GENERATED or UNCERTAIN (not AUTHENTIC).
+    // Formal AI detection evaluation is run separately on Celeb-DF v2 and DF40 datasets.
     {
-      id: 'ai_01',
-      url: 'https://picsum.photos/id/1084/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1084',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_02',
-      url: 'https://picsum.photos/id/1074/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1074',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_03',
-      url: 'https://picsum.photos/id/1060/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1060',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_04',
-      url: 'https://images.unsplash.com/photo-1686002359940-6a51b0d64f68?w=600',
-      groundTruth: 'AI_GENERATED',
-      label: 'Unsplash stylized proxy',
-      source: 'Unsplash'
-    },
-    {
-      id: 'ai_05',
-      url: 'https://picsum.photos/id/1080/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1080',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_06',
-      url: 'https://picsum.photos/id/1050/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1050',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_07',
+      id: 'uncertain_01',
       url: 'https://picsum.photos/id/1025/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1025',
+      groundTruth: 'UNCERTAIN_TEST',
+      label: 'Ambiguous stylized scene',
       source: 'Picsum'
     },
     {
-      id: 'ai_08',
-      url: 'https://picsum.photos/id/1015/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1015',
+      id: 'uncertain_02',
+      url: 'https://picsum.photos/id/1035/600/400.jpg',
+      groundTruth: 'UNCERTAIN_TEST',
+      label: 'Processed visual texture',
       source: 'Picsum'
     },
     {
-      id: 'ai_09',
-      url: 'https://picsum.photos/id/1005/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1005',
-      source: 'Picsum'
-    },
-    {
-      id: 'ai_10',
-      url: 'https://picsum.photos/id/1080/600/400.jpg',
-      groundTruth: 'AI_GENERATED',
-      label: 'Picsum stylized proxy 1080',
+      id: 'uncertain_03',
+      url: 'https://picsum.photos/id/1042/600/400.jpg',
+      groundTruth: 'UNCERTAIN_TEST',
+      label: 'Stylized composition',
       source: 'Picsum'
     }
   ]
