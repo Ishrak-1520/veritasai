@@ -67,7 +67,7 @@ function addSection(doc, title) {
 
 // ─── Main generator ───────────────────────────────────────────────────────────
 
-function generateEvidenceReport(scan) {
+async function generateEvidenceReport(scan) {
   return new Promise((resolve, reject) => {
     console.log('[PDF] Generating report for scan:', scan.id, '| fields:', Object.keys(scan).join(', '));
 
@@ -75,17 +75,13 @@ function generateEvidenceReport(scan) {
       size: 'A4',
       margin: 60,
       bufferPages: true,
-      info: {
-        Title: 'VeritasAI Forensic Report — ' + scan.id,
-        Author: 'VeritasAI',
-        Subject: 'AI-Generated Media Forensic Analysis',
-      }
+      autoFirstPage: true
     });
 
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const verdict = scan.verdict || 'UNCERTAIN';
@@ -130,7 +126,6 @@ function generateEvidenceReport(scan) {
     // Center-right — verdict label
     const verdictLabel = VERDICT_LABELS[verdict] || VERDICT_LABELS.UNCERTAIN;
     doc.font('Helvetica-Bold').fontSize(14).fillColor('#ffffff');
-    // Vertically centered around y=40 approximately
     doc.text(verdictLabel, doc.page.width - 280, pageTop + 42, { width: 180, align: 'right', lineBreak: false });
 
     // Right side — confidence
@@ -152,7 +147,6 @@ function generateEvidenceReport(scan) {
     doc.moveDown(1);
     
     const disclaimerY = doc.y;
-    // Calculate height roughly based on text
     const disclaimerHeight = 44; 
     
     doc.save();
@@ -257,26 +251,26 @@ function generateEvidenceReport(scan) {
       if (signal.name.trim() === '\\') return false;
       if (signal.name.trim() === '') return false;
       if (signal.name.includes('}, {')) return false;
-      if (signal.name.includes('\\\"')) return false;
+      if (signal.name.includes('\\"')) return false;
       if (signal.name.length > 60) return false; // names should be short
       return true;
     }).map(signal => ({
       ...signal,
       // Clean the name
       name: signal.name
-        .replace(/^[\\/"'\\s]+/, '')   // strip leading junk
-        .replace(/[\\/"']+$/, '')     // strip trailing junk
+        .replace(/^[\\/\"'\\s]+/, '')   // strip leading junk
+        .replace(/[\\/\"']+$/, '')     // strip trailing junk
         .replace(/\\\\+/g, '')          // remove backslashes
         .trim(),
       // Clean the description
       technical_description: (signal.technical_description || '')
-        .replace(/^[\\/"'\\s]+/, '')   // strip leading junk chars
-        .replace(/^\\\\?"?/, '')        // remove leading \\" or "
-        .replace(/\\\\?"?$/, '')        // remove trailing \\" or "
-        .replace(/\\\\"/g, '"')         // unescape escaped quotes
-        .replace(/"\\s*},\\s*\\{.*$/s, '') // remove JSON fragments at end
-        .replace(/\\}\\s*\\].*$/s, '')   // remove array closing fragments
-        .replace(/\\s+/g, ' ')         // collapse whitespace
+        .replace(/^[\\/\"'\\s]+/, '')   // strip leading junk chars
+        .replace(/^\\\\?\"?/, '')        // remove leading \\" or "
+        .replace(/\\\\?\"?$/, '')        // remove trailing \\" or "
+        .replace(/\\\\\"/g, '"')         // unescape escaped quotes
+        .replace(/\"\s*},\s*\{.*$/s, '') // remove JSON fragments at end
+        .replace(/\}\s*\].*$/s, '')   // remove array closing fragments
+        .replace(/\s+/g, ' ')         // collapse whitespace
         .trim()
         // If description is still garbage (too short or has JSON chars), replace it
         || 'Analysis detected this signal during forensic examination.'
@@ -384,64 +378,60 @@ function generateEvidenceReport(scan) {
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // FOOTER on every page
+    // FOOTERS — must happen BEFORE doc.end(), inside setImmediate
     // ───────────────────────────────────────────────────────────────────────
 
-    // ── FOOTERS ──────────────────────────────────────
-    // Must happen after all content, before doc.end()
-    const pageRange = doc.bufferedPageRange();
-    const pageCount = pageRange.count;
-    console.log('[PDF] Total content pages:', pageCount);
-  
-    for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
-      doc.switchToPage(pageIndex);
-  
-      const pageBottom = doc.page.height - 50;
-      const pageLeft = 60;
-      const pageRight = doc.page.width - 60;
-  
-      // Horizontal line above footer
-      doc.save();
-      doc.moveTo(pageLeft, pageBottom)
-         .lineTo(pageRight, pageBottom)
-         .lineWidth(0.5)
-         .strokeColor('#cccccc')
-         .stroke();
-      doc.restore();
-  
-      // Left: Scan ID in Courier
-      doc.save();
-      doc.font('Courier')
-         .fontSize(7)
-         .fillColor('#999999')
-         .text(
-           'VeritasAI — Scan: ' + (scan.id || 'N/A'),
-           pageLeft,
-           pageBottom + 8,
-           { lineBreak: false, width: 300 }
-         );
-      doc.restore();
-  
-      // Right: Page number in Helvetica
-      doc.save();
-      doc.font('Helvetica')
-         .fontSize(7)
-         .fillColor('#999999')
-         .text(
-           'Page ' + (pageIndex + 1) + ' of ' + pageCount,
-           pageLeft,
-           pageBottom + 8,
-           { 
-             lineBreak: false, 
-             width: pageRight - pageLeft,
-             align: 'right' 
-           }
-         );
-      doc.restore();
-    }
-  
-    // ONE AND ONLY doc.end() call — absolutely last line
-    doc.end();
+    setImmediate(() => {
+      try {
+        const range = doc.bufferedPageRange();
+        const total = range.count;
+
+        console.log('[PDF] Content pages:', total);
+
+        for (let i = 0; i < total; i++) {
+          doc.switchToPage(i);
+
+          // Draw footer line
+          doc.moveTo(60, doc.page.height - 50)
+             .lineTo(doc.page.width - 60, doc.page.height - 50)
+             .lineWidth(0.5)
+             .strokeColor('#cccccc')
+             .stroke();
+
+          // Scan ID (left)
+          doc.font('Courier')
+             .fontSize(7)
+             .fillColor('#999999')
+             .text(
+               'VeritasAI \u2014 Scan: ' + (scan.id || 'N/A'),
+               60,
+               doc.page.height - 38,
+               { lineBreak: false, width: 300 }
+             );
+
+          // Page number (right)
+          doc.font('Helvetica')
+             .fontSize(7)
+             .fillColor('#999999')
+             .text(
+               'Page ' + (i + 1) + ' of ' + total,
+               60,
+               doc.page.height - 38,
+               {
+                 lineBreak: false,
+                 width: doc.page.width - 120,
+                 align: 'right'
+               }
+             );
+        }
+
+        // doc.end() is called INSIDE setImmediate, AFTER footer loop
+        doc.end();
+
+      } catch (err) {
+        reject(err);
+      }
+    });
   });
 }
 
