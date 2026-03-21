@@ -65,6 +65,51 @@ function addSection(doc, title) {
   doc.moveDown(0.6);
 }
 
+// ─── Footer helper — draws footer on the CURRENT page ────────────────────────
+
+function drawPageFooter(doc, scanId, pageNum) {
+  const footerY = doc.page.height - 45;
+  const leftEdge = 60;
+  const rightEdge = doc.page.width - 60;
+
+  doc.save();
+
+  // Horizontal line
+  doc.moveTo(leftEdge, footerY - 8)
+     .lineTo(rightEdge, footerY - 8)
+     .lineWidth(0.5)
+     .strokeColor('#cccccc')
+     .stroke();
+
+  // Left: scan ID
+  doc.font('Courier')
+     .fontSize(7)
+     .fillColor('#999999')
+     .text(
+       'VeritasAI \u2014 Scan: ' + (scanId || 'N/A'),
+       leftEdge,
+       footerY,
+       { lineBreak: false, width: 300 }
+     );
+
+  // Right: page number
+  doc.font('Helvetica')
+     .fontSize(7)
+     .fillColor('#999999')
+     .text(
+       'Page ' + pageNum,
+       leftEdge,
+       footerY,
+       {
+         lineBreak: false,
+         width: rightEdge - leftEdge,
+         align: 'right'
+       }
+     );
+
+  doc.restore();
+}
+
 // ─── Main generator ───────────────────────────────────────────────────────────
 
 async function generateEvidenceReport(scan) {
@@ -73,15 +118,16 @@ async function generateEvidenceReport(scan) {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margin: 60,
-      bufferPages: true,
-      autoFirstPage: true
+      margin: 60
     });
 
     const chunks = [];
     doc.on('data', chunk => chunks.push(chunk));
     doc.on('error', reject);
     doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+    // Page counter for inline footer drawing
+    let currentPage = 1;
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
     const verdict = scan.verdict || 'UNCERTAIN';
@@ -290,8 +336,10 @@ async function generateEvidenceReport(scan) {
       const descHeight = doc.heightOfString(signal.technical_description || ' ', { width: pageWidth - 24 });
       const blockHeight = 24 + descHeight + 10;
 
-      // Check if we need a new page
+      // Check if we need a new page — draw footer on current page first
       if (doc.y + blockHeight > doc.page.height - doc.page.margins.bottom - 40) {
+        drawPageFooter(doc, scan.id, currentPage);
+        currentPage++;
         doc.addPage();
         doc.y = doc.page.margins.top;
       }
@@ -342,6 +390,8 @@ async function generateEvidenceReport(scan) {
 
     if (exp.how_detected || exp.what_to_look_for || exp.technology_note) {
       if (doc.y > doc.page.height - 180) {
+        drawPageFooter(doc, scan.id, currentPage);
+        currentPage++;
         doc.addPage();
         doc.y = doc.page.margins.top;
       }
@@ -358,7 +408,12 @@ async function generateEvidenceReport(scan) {
       }
 
       if (exp.what_to_look_for) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) { doc.addPage(); doc.y = doc.page.margins.top; }
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+          drawPageFooter(doc, scan.id, currentPage);
+          currentPage++;
+          doc.addPage();
+          doc.y = doc.page.margins.top;
+        }
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
         doc.text('What To Look For Yourself');
         doc.moveDown(0.3);
@@ -368,7 +423,12 @@ async function generateEvidenceReport(scan) {
       }
 
       if (exp.technology_note) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) { doc.addPage(); doc.y = doc.page.margins.top; }
+        if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+          drawPageFooter(doc, scan.id, currentPage);
+          currentPage++;
+          doc.addPage();
+          doc.y = doc.page.margins.top;
+        }
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
         doc.text('About The Technology');
         doc.moveDown(0.3);
@@ -378,60 +438,14 @@ async function generateEvidenceReport(scan) {
     }
 
     // ───────────────────────────────────────────────────────────────────────
-    // FOOTERS — must happen BEFORE doc.end(), inside setImmediate
+    // FINAL FOOTER — draw on the last page, then end
     // ───────────────────────────────────────────────────────────────────────
 
-    setImmediate(() => {
-      try {
-        const range = doc.bufferedPageRange();
-        const total = range.count;
+    drawPageFooter(doc, scan.id, currentPage);
+    console.log('[PDF] Total pages written:', currentPage);
 
-        console.log('[PDF] Content pages:', total);
-
-        for (let i = 0; i < total; i++) {
-          doc.switchToPage(i);
-
-          // Draw footer line
-          doc.moveTo(60, doc.page.height - 50)
-             .lineTo(doc.page.width - 60, doc.page.height - 50)
-             .lineWidth(0.5)
-             .strokeColor('#cccccc')
-             .stroke();
-
-          // Scan ID (left)
-          doc.font('Courier')
-             .fontSize(7)
-             .fillColor('#999999')
-             .text(
-               'VeritasAI \u2014 Scan: ' + (scan.id || 'N/A'),
-               60,
-               doc.page.height - 38,
-               { lineBreak: false, width: 300 }
-             );
-
-          // Page number (right)
-          doc.font('Helvetica')
-             .fontSize(7)
-             .fillColor('#999999')
-             .text(
-               'Page ' + (i + 1) + ' of ' + total,
-               60,
-               doc.page.height - 38,
-               {
-                 lineBreak: false,
-                 width: doc.page.width - 120,
-                 align: 'right'
-               }
-             );
-        }
-
-        // doc.end() is called INSIDE setImmediate, AFTER footer loop
-        doc.end();
-
-      } catch (err) {
-        reject(err);
-      }
-    });
+    // ONE AND ONLY doc.end() call
+    doc.end();
   });
 }
 
