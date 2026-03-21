@@ -4,24 +4,24 @@ module.exports = {
     // Real photographs from Wikipedia Commons and public domain
     {
       id: 'auth_01',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/320px-Camponotus_flavomarginatus_ant.jpg',
+      url: 'https://picsum.photos/id/15/600/400.jpg',
       groundTruth: 'AUTHENTIC',
-      label: 'Ant macro photograph',
-      source: 'Wikipedia Commons'
+      label: 'Nature stream',
+      source: 'Unsplash/Picsum'
     },
     {
       id: 'auth_02',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Bikesgray.jpg/320px-Bikesgray.jpg',
+      url: 'https://picsum.photos/id/20/600/400.jpg',
       groundTruth: 'AUTHENTIC',
-      label: 'Bicycles photograph',
-      source: 'Wikipedia Commons'
+      label: 'Mountain road',
+      source: 'Unsplash/Picsum'
     },
     {
       id: 'auth_03',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Stonehenge.jpg/320px-Stonehenge.jpg',
+      url: 'https://picsum.photos/id/37/600/400.jpg',
       groundTruth: 'AUTHENTIC',
-      label: 'Stonehenge landscape',
-      source: 'Wikipedia Commons'
+      label: 'Forest detail',
+      source: 'Unsplash/Picsum'
     },
     {
       id: 'auth_04',
@@ -77,73 +77,73 @@ module.exports = {
     // From public AI art repositories and known generative sources
     {
       id: 'ai_01',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/A_cat_in_a_field_of_flowers%2C_created_with_Stable_Diffusion.jpg/320px-A_cat_in_a_field_of_flowers%2C_created_with_Stable_Diffusion.jpg',
+      url: 'https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/txt2img/merged-0006.png',
       groundTruth: 'AI_GENERATED',
-      label: 'Stable Diffusion cat',
-      source: 'Wikipedia Commons (Stable Diffusion)'
+      label: 'Stable Diffusion sample 1',
+      source: 'CompVis/stable-diffusion (GitHub)'
     },
     {
       id: 'ai_02',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/A_Midjourney_generated_image_of_a_woman.jpg/240px-A_Midjourney_generated_image_of_a_woman.jpg',
+      url: 'https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/txt2img/merged-0005.png',
       groundTruth: 'AI_GENERATED',
-      label: 'Midjourney portrait',
-      source: 'Wikipedia Commons (Midjourney)'
+      label: 'Stable Diffusion sample 2',
+      source: 'CompVis/stable-diffusion (GitHub)'
     },
     {
       id: 'ai_03',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/thirty/Eliezer_Yudkowsky-2021-photo-DALL-E.jpg/240px-Eliezer_Yudkowsky-2021-photo-DALL-E.jpg',
+      url: 'https://raw.githubusercontent.com/CompVis/stable-diffusion/main/assets/stable-samples/txt2img/merged-0004.png',
       groundTruth: 'AI_GENERATED',
-      label: 'DALL-E portrait',
-      source: 'Wikipedia Commons (DALL-E)'
+      label: 'Stable Diffusion sample 3',
+      source: 'CompVis/stable-diffusion (GitHub)'
     },
     {
       id: 'ai_04',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Artificial_intelligence_and_blockchain_in_social_media_generated_by_stable_diffusion.jpg/320px-Artificial_intelligence_and_blockchain_in_social_media_generated_by_stable_diffusion.jpg',
+      url: 'https://raw.githubusercontent.com/NVlabs/stylegan2/master/docs/teaser-1024x256.png',
       groundTruth: 'AI_GENERATED',
-      label: 'Stable Diffusion abstract',
-      source: 'Wikipedia Commons (Stable Diffusion)'
+      label: 'StyleGAN2 faces',
+      source: 'NVlabs/stylegan2 (GitHub)'
     },
     {
       id: 'ai_05',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/2023_Stable_Diffusion_XL_-_Astronaut.jpg/256px-2023_Stable_Diffusion_XL_-_Astronaut.jpg',
+      url: 'https://raw.githubusercontent.com/NVlabs/stylegan3/main/docs/stylegan3-t-ffhq-1024x1024.png',
       groundTruth: 'AI_GENERATED',
-      label: 'Stable Diffusion XL astronaut',
-      source: 'Wikipedia Commons (SDXL)'
+      label: 'StyleGAN3 portrait',
+      source: 'NVlabs/stylegan3 (GitHub)'
     },
     {
       id: 'ai_06',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Above_Gotham.jpg/310px-Above_Gotham.jpg',
+      url: 'https://raw.githubusercontent.com/CompVis/taming-transformers/master/assets/reconstruction_tfr.jpg',
       groundTruth: 'AI_GENERATED',
-      label: 'AI cityscape',
-      source: 'Wikipedia Commons (AI)'
+      label: 'VQGAN reconstruction',
+      source: 'CompVis/taming-transformers (GitHub)'
     },
     {
       id: 'ai_07',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/A_vision_for_the_future_of_sustainable_energy%2C_AI-generated_art.jpg/320px-A_vision_for_the_future_of_sustainable_energy%2C_AI-generated_art.jpg',
+      url: 'https://raw.githubusercontent.com/CompVis/taming-transformers/master/assets/teaser.png',
       groundTruth: 'AI_GENERATED',
-      label: 'AI energy concept art',
-      source: 'Wikipedia Commons (AI)'
+      label: 'VQGAN teaser',
+      source: 'CompVis/taming-transformers (GitHub)'
     },
     {
       id: 'ai_08',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Nightcafe_-_woman.jpg/256px-Nightcafe_-_woman.jpg',
+      url: 'https://raw.githubusercontent.com/lucidrains/DALLE-pytorch/main/sample.png',
       groundTruth: 'AI_GENERATED',
-      label: 'NightCafe AI portrait',
-      source: 'Wikipedia Commons (NightCafe)'
+      label: 'DALL-E PyTorch sample',
+      source: 'lucidrains/DALLE-pytorch (GitHub)'
     },
     {
       id: 'ai_09',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Stable_Diffusion_img2img_eagle.jpg/320px-Stable_Diffusion_img2img_eagle.jpg',
+      url: 'https://raw.githubusercontent.com/Stability-AI/stablediffusion/main/assets/stable-samples/txt2img/768/merged-0002.png',
       groundTruth: 'AI_GENERATED',
-      label: 'Stable Diffusion eagle',
-      source: 'Wikipedia Commons (Stable Diffusion)'
+      label: 'Stable Diffusion v2',
+      source: 'Stability-AI/stablediffusion (GitHub)'
     },
     {
       id: 'ai_10',
-      url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/twenty/DALL-E_2_image_of_a_panda_making_latte_art.jpg/256px-DALL-E_2_image_of_a_panda_making_latte_art.jpg',
+      url: 'https://raw.githubusercontent.com/openai/DALL-E/master/images/encoded.png',
       groundTruth: 'AI_GENERATED',
-      label: 'DALL-E 2 panda',
-      source: 'Wikipedia Commons (DALL-E 2)'
+      label: 'OpenAI DALL-E encoded',
+      source: 'openai/DALL-E (GitHub)'
     }
   ]
 };

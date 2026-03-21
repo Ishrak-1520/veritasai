@@ -27,6 +27,18 @@ async function clearBenchmarkCache() {
  */
 async function runBenchmark(onProgress) {
   const db = getDb();
+  
+  // Clear cached failed downloads/analyses so the benchmark can be re-run.
+  try {
+    await db.execute({
+      sql: 'DELETE FROM benchmark_results WHERE verdict = ? OR verdict IS NULL',
+      args: ['ERROR']
+    });
+    console.log('[Benchmark] Cleared ERROR results from cache');
+  } catch (e) {
+    console.warn('[Benchmark] Could not clear cache:', e.message);
+  }
+
   const resultsTable = await getBenchmarkResults();
   
   // Create a quick lookup for cached results
@@ -58,7 +70,12 @@ async function runBenchmark(onProgress) {
     let confidence = 0;
 
     try {
-      const response = await fetch(image.url);
+      const response = await fetch(image.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; VeritasAI-Research/1.0)',
+          'Accept': 'image/webp,image/jpeg,image/png,image/*'
+        }
+      });
       if (!response.ok) throw new Error('Failed to download image.');
       
       const buffer = Buffer.from(await response.arrayBuffer());
