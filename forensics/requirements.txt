@@ -1,0 +1,8 @@
+flask
+flask-cors
+Pillow
+numpy
+scipy
+opencv-python-headless
+gunicorn
+requests
