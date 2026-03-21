@@ -53,6 +53,13 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
+  skip: (req) => {
+    const ip = req.ip || req.connection.remoteAddress || ''
+    return ip === '127.0.0.1' ||
+           ip === '::1' ||
+           ip === '::ffff:127.0.0.1' ||
+           ip.includes('127.0.0.1')
+  }
 });
 
 // Analyze limiter — POST /api/analyze only
@@ -63,6 +70,12 @@ const analyzeLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Analysis limit reached. You can run 15 scans per hour.' },
   skip: (req) => {
+    // Skip rate limit for localhost (research experiments)
+    const ip = req.ip || req.connection.remoteAddress || ''
+    if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.includes('127.0.0.1')) {
+      return true
+    }
+
     // Skip rate limit for authenticated users (they get the global limit instead)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -84,6 +97,13 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many auth attempts. Please wait 15 minutes.' },
+  skip: (req) => {
+    const ip = req.ip || req.connection.remoteAddress || ''
+    return ip === '127.0.0.1' ||
+           ip === '::1' ||
+           ip === '::ffff:127.0.0.1' ||
+           ip.includes('127.0.0.1')
+  }
 });
 
 app.use(globalLimiter);
